@@ -11,7 +11,7 @@
 - 注入：render_template_block() 生成追加到 LLM prompt 的文本块；
   LLM 不可用/未激活模板时链路行为与从前完全一致（零副作用）
 - 约束：sample_input / sample_output 各限 4000 字符，防 prompt 膨胀
-- 日志走 logging.getLogger("local_chronicles_ocr")（CLAUDE.md §约束 #5）
+- 日志走 logging.getLogger("local_chronicles_ocr")
 """
 from __future__ import annotations
 

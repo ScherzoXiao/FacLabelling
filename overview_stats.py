@@ -142,7 +142,7 @@ def project_gold_summary(annot_dir: Path,
     ad = Path(annot_dir)
     if ad.exists():
         for jf in ad.glob("*.jsonl"):
-            # `0000_官报_..._0001.png.jsonl` → 去掉 ".jsonl" 得到图名（与
+            # `样例材料_..._0001.png.jsonl` → 去掉 ".jsonl" 得到图名（与
             # project_assignments 的键一致）；旧数据有丢后缀的（`img1.jsonl`），
             # 故再退回按 stem 查一次——**双查而非猜**，查不到才算未归属。
             name = jf.name[:-len(".jsonl")]

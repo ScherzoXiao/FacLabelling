@@ -20,7 +20,7 @@
    `--project` 一页都取不到**（只有 `--inbox` 通）。这是「看起来能跑、
    实际取空」的静默断裂，所以 `assign` 不是锦上添花，是闭合必需的一环。
 
-★ **不重造任何一环**（`CLAUDE.md` §60）：
+★ **不重造任何一环**：
   · 建/列/查栏目 → `data_io.create_project` / `list_projects` / `get_project`
   · 归属 → `data_io.assign_images_batch` / `unassign_image` / `list_project_images`
   · 模板解析 → `summary_template.extract_text` + `extract_attr_headers`
@@ -582,7 +582,7 @@ def add_subcommands(sub, func=None) -> None:
     """把全部动作挂到给定的 subparsers 对象上。
 
     ★ **单一来源**：`chronicles.py` 与本模块的 `build_parser` 都调它 ——
-      参数名与帮助文本不会在两处漂移（`CLAUDE.md` §60）。
+      参数名与帮助文本不会在两处漂移。
     `func` 给定 → 设 `func=<可调用>`（供 `chronicles` 统一分派）；
     缺省 → 设成**动作名字符串**（供本模块 `main` 自己分派）。
     """

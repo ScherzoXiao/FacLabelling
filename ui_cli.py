@@ -156,7 +156,7 @@ def launch_argv(script: Path, *, root: Optional[Path] = None,
     · 必带 `--port 5001`（`config.SKILL_FLASK_PORT`）：**固定端口**，
       不读壳的 FLASK_PORT——本机壳开着（5000）也不冲突，探测/复用/地址
       生成全以 5001 为准。
-    · 浏览器开关是 `--open` flag（缺省不开；本机默认浏览器是联想浏览器）。
+    · 浏览器开关是 `--open` flag（缺省不开）。
     """
     return [sys.executable, str(script),
             "--root", str(root or ROOT),
@@ -185,8 +185,8 @@ def serve(*, wait: float = 30.0, open_browser: bool = False,
           surface: str = SURFACE_SKILL) -> Dict[str, Any]:
     """起标注页服务（技能包自有面，端口 5001）。**已在跑则直接复用**（不起第二个）。
 
-    `open_browser=False`（缺省）会设 `OPEN_BROWSER=0` —— 本机默认浏览器是联想浏览器，
-      由 agent 起服务时不该弹窗；地址交给调用方转达（`CLAUDE.md` 本机铁律）。
+    `open_browser=False`（缺省）会设 `OPEN_BROWSER=0` —— 自动拉起浏览器在多数环境下不可靠，
+      由 agent 起服务时不该弹窗；地址交给调用方转达（既有约定）。
     ★ 探测**先于**一切：5001 已在跑就复用。壳的 5000 与本通道无关——
       两边可并存（壳=完整工作台，5001=标注/验收页），互不顶掉。
     """
@@ -400,14 +400,14 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     """把 `ui` 的参数挂上去。
 
     ★ **单一来源**：`chronicles.py` 与本模块的 `build_parser` 都调它 ——
-      参数名与帮助文本不会在两处漂移（`CLAUDE.md` §60）。
+      参数名与帮助文本不会在两处漂移。
     """
     p.add_argument("--serve", action="store_true", dest="serve_flag",
                    help="起标注页服务（★ 2026-09-16 新裁定；已在跑则复用，不重复起）")
     p.add_argument("--wait", type=float, default=30.0,
                    help="起服务后等端口通的秒数（默认 30）")
     p.add_argument("--open-browser", action="store_true",
-                   help="起服务后顺带打开浏览器（默认不开；本机默认浏览器是联想浏览器）")
+                   help="起服务后顺带打开浏览器（默认不开）")
     p.add_argument("--stem", default="", help="顺带给出该页的标注地址")
     p.add_argument("--stems", nargs="+", default=None, help="顺带给出多页的标注地址")
     p.add_argument("--json", action="store_true", dest="as_json")

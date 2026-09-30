@@ -7,8 +7,8 @@
     `require_auth`，约 45 行）。而技能包要拥有**自己的**交互面
     （`skill/chronicles-app/surface.py`），它**不得 import app**
     （`app.py` = 7458 行桌面应用层；`__import__` 会把 `rag` / `chat_*` /
-    `reassembler` / `batch_import` 一并拖进来 —— 实测见 `_probe/m3.txt`）。
-    若在交互面里照抄一份 → **第二份真相**（`CLAUDE.md` §60）。
+    `reassembler` / `batch_import` 一并拖进来 —— 实测）。
+    若在交互面里照抄一份 → **第二份真相**。
 
     ⇒ 正确做法 = 把这份语义**下沉为内核**：两个消费者（桌面版 `app.py`、
     技能包交互面）**转调同一实现**。

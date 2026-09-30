@@ -40,7 +40,7 @@ scripts/make_mcp_config.py     # 生成本机 MCP 客户端配置
 
 ```
 python -m venv venv
-venv\Scripts\pip install -r requirements.txt      # Linux/macOS: venv/bin/pip
+venv\Scripts\pip install -r requirements.txt # Linux/macOS: venv/bin/pip
 ```
 
 Python ≥ 3.11。

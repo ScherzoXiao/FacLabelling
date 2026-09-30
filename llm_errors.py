@@ -1,6 +1,6 @@
 """P-K7 LLM 异常类（v5.1）。
 
-设计：自定义异常类传业务异常（CLAUDE.md 编码规范），不要直接用 Exception。
+设计：自定义异常类传业务异常（项目编码规范），不要直接用 Exception。
 - ProviderNotConfigured: provider 缺 api_key 或 config
 - ProviderAPIError: 上游 HTTP 错误（非 429）
 - RateLimited: 429 限流

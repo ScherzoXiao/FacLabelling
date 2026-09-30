@@ -36,7 +36,7 @@ import zhconv  # 繁简归一（已在 venv 装好）
 
 import corrected_text  # ✅ P-K9 阶段 0b：校正感知读取（口径同 unit_builder）
 
-# CLAUDE.md §约束 #5：日志走统一 logger，禁止 print
+# 日志走统一 logger，禁止 print
 log = logging.getLogger("local_chronicles_ocr")
 
 # ✅ PyInstaller 冻结模式兼容
@@ -53,13 +53,13 @@ DEFAULT_KNOWLEDGE_DIR = _BASE / "knowledge_cards"
 # 反解析引用）零生产调用——现行引用机制为检索侧构造 references + M16 空 quotes 闸，
 # 不再从输出文本提取。删除连带其专属测试（test_p_knowledge_chat_rag Test10/11/14 等）。
 
-# === 阶段 4：corpus 缓存（CLAUDE.md #10 备份纪律之外的运行时缓存）===
+# === 阶段 4：corpus 缓存（备份纪律之外的运行时缓存）===
 # 结构：{cache_key: {"stems": [...], "tokenized": [[toks]], "tfidf": [dict], "norms": [float], "built_at": float, "corpus_hash": str}}
 _CORPUS_CACHE: dict = {}
 _CORPUS_CACHE_MAXSIZE = 8  # 最多缓存 8 个 scope 的 corpus（LRU 简化版）
 _CORPUS_CACHE_TTL = 300.0   # 5 分钟内复用（避免长时间过期数据）
 
-# === 模块级 RLock 保护（CLAUDE.md 编码规范：业务异常走自定义类，但模块级锁 stdlib 即可）===
+# === 模块级 RLock 保护（项目编码规范：业务异常走自定义类，但模块级锁 stdlib 即可）===
 _lock = threading.RLock()
 
 
@@ -89,7 +89,7 @@ def load_image_fulltext(
     粒度防护），未校对的图行为不变。
 
     Args:
-        image_stem: 图片 stem（无扩展名），如 "clipboard_20260819_193213_1de770b5"
+        image_stem: 图片 stem（无扩展名），如 "clipboard_样例"
         data_dir: data/structured 目录
         corrected_map: 注入的修正表（测试用）。None → 按 data_dir 反推主工作簿。
 
@@ -132,7 +132,7 @@ def load_all_image_fulltexts(
 
     Args:
         scope: "current_project" / "all_projects" / "selected_images"
-        project_id: 当前项目 id（如"测试用归类栏目_0e8aba"）— current_project 时必填
+        project_id: 当前项目 id（如"<栏目id>"）— current_project 时必填
         project_name: 当前项目名（v5.1：作为 knowledge_cards 子目录名）
         selected_images: 选中的 image_stem 列表（selected_images 时必填）
         data_dir / knowledge_dir: 数据源
@@ -405,10 +405,10 @@ def build_rag_prompt(
     """
     if system_prompt is None:
         system_prompt = (
-            "你是地方志档案助手，基于以下检索到的知识卡片内容回答用户问题。\n"
+            "你是档案资料助手，基于以下检索到的知识卡片内容回答用户问题。\n"
             "如果检索内容与问题无关，请回答「未找到相关信息」，**不要编造内容**。\n"
             "回答末尾标注引用：参考 [<card_id>]，card_id 形如 section_<image_stem>_col_<col_index>。\n"
-            "引用示例：参考 [section_clipboard_20260819_193213_1de770b5_col_0]\n"
+            "引用示例：参考 [section_clipboard_样例_col_0]\n"
             "检索内容来自 OCR，未经人工校对的字句可能有识别错误；"
             "涉及精确字句（人名、机构名、年份、金额数字）时，请提示用户核对原图。"
         )
@@ -1347,7 +1347,7 @@ def hybrid_search_v2(
         # ✅ v2 修正：image_stem 还原为真实图片 stem（unit_<stem>_<seq> → <stem>），
         # 前端显示 / 日志聚合用；card_id 保留语料 key 供脚注白名单与 eval 适配。
         # ✅ P-K9 阶段 0d：前缀扩到 (unit|gold)（金标准卡）；量词改贪婪——
-        #    非贪婪在 stem 本身以 _dddd 结尾时（如「官报…_0001」）会少剥一段，
+        # 非贪婪在 stem 本身以 _dddd 结尾时（如「材料名…_0001」）会少剥一段，
         #    导致 image_stem 显示被截断。贪婪取到"最后一个 _dddd 之前"，正确。
         m = re.match(r"(?:unit|gold)_(.+)_\d{4}$", cid)
         if m:
@@ -1478,7 +1478,7 @@ def search_with_fallback(
             for cid, sim in ranked:
                 full_text = corpus.get(cid, "")
                 # ✅ P-K9 阶段 0d：前缀扩到 (unit|gold)（金标准卡）；量词改贪婪——
-                #    非贪婪在 stem 本身以 _dddd 结尾时（如「官报…_0001」）会少剥一段，
+                # 非贪婪在 stem 本身以 _dddd 结尾时（如「材料名…_0001」）会少剥一段，
                 #    导致 image_stem 显示被截断。贪婪取到"最后一个 _dddd 之前"，正确。
                 m = re.match(r"(?:unit|gold)_(.+)_\d{4}$", cid)
                 res.append({
@@ -1572,7 +1572,7 @@ def aggregate_amount_search(
     for amt, cid in cands[:max(1, top_k)]:
         full_text = corpus.get(cid, "")
         # ✅ P-K9 阶段 0d：前缀扩到 (unit|gold)（金标准卡）；量词改贪婪——
-        #    非贪婪在 stem 本身以 _dddd 结尾时（如「官报…_0001」）会少剥一段，
+        # 非贪婪在 stem 本身以 _dddd 结尾时（如「材料名…_0001」）会少剥一段，
         #    导致 image_stem 显示被截断。贪婪取到"最后一个 _dddd 之前"，正确。
         m = re.match(r"(?:unit|gold)_(.+)_\d{4}$", cid)
         results.append({
@@ -1720,7 +1720,7 @@ def verify_relevance(
 
 # 阶段 4-B 用的 JSON system prompt（强制 LLM 输出结构化）
 STRUCTURED_SYSTEM_PROMPT = (
-    "你是地方志档案助手，必须严格基于检索片段回答，禁止编造。\n"
+    "你是档案资料助手，必须严格基于检索片段回答，禁止编造。\n"
     "请按以下 JSON 格式输出（仅输出 JSON，不要其他文字）：\n"
     "{\n"
     '  "relevant_quotes": ["<逐字摘录检索片段中含问题关键词或与问题相关的原文，1-3 段>"],\n'
@@ -1740,7 +1740,7 @@ STRUCTURED_SYSTEM_PROMPT = (
     "7. confidence < 0.5 时，answer 可以以'根据有限信息，'开头，但**仍要列出 quotes 中的具体内容**。\n"
     "8. answer 末尾用一次：'参考 [<card_id>]'（card_id 形如 section_<stem>_col_<col_index>）。\n"
     "9. **负面问题必须明确拒答**：若 quotes 只是出现了与问题关键词相同的字眼（人名/年号/地名等），\n"
-    "   但**不含问题所问的实际内容**（如问'田赋与清代相比的变化'，片段只有'巴县志卷八姓名'这类\n"
+    " 但**不含问题所问的实际内容**（如问'田赋与清代相比的变化'，片段只有'某卷第八册姓名'这类\n"
     "   人名罗列；问'战后赔偿条款'，片段只有碰巧同姓的人名），answer 必须以'未找到相关信息'开头，\n"
     "   再用一句话说明片段实际内容是什么。禁止把'仅出现关键词'包装成部分回答。\n"
     "10. **识别可靠性**：检索片段来自 OCR，未经人工校对的字句可能有识别错误。"
@@ -1809,7 +1809,7 @@ def build_structured_rag_prompt(
 # - 阶段 2：把 verified quotes 喂给 LLM，让它"基于已验证的事实"自由生成详细答案
 # 这样 LLM 既不会编造（用代码约束），又可以自由发挥（基于真值）
 ANSWER_FROM_QUOTES_SYSTEM_PROMPT = (
-    "你是地方志档案助手。基于已通过真值校验的原文片段（**已被系统验证确实来自检索材料**），"
+    "你是档案资料助手。基于已通过真值校验的原文片段（**已被系统验证确实来自检索材料**），"
     "生成对用户问题的详细、准确回答。\n"
     "硬性规则：\n"
     "1. answer 必须只基于 verified_quotes 提供的具体信息（如人名、年号、数字）。\n"
@@ -1890,7 +1890,7 @@ def parse_structured_response(raw_text: str) -> dict:
     try:
         obj = json.loads(text)
     except (json.JSONDecodeError, ValueError):
-        # ✅ M28：LLM 输出瑕疵容错——实测（eval_20260901_182920 Q083/Q084）deepseek
+        # ✅ M28：LLM 输出瑕疵容错——实测（一次批量评测的 Q083/Q084）deepseek
         # 偶发在 JSON 尾部多打一个闭合括号（"confidence": 0.0}\n}）导致整段 parse
         # 失败。后果：负样本时 raw JSON 直接呈现给用户；正样本时被 M16 空 quotes
         # 闸误杀成"未找到"。修法：用 raw_decode 提取第一个**完整** JSON 对象，

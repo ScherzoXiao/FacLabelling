@@ -1,6 +1,6 @@
 """P1a（2026-09-04）：文献类型档案存储（collection profile store）。
 
-背景见《复杂版面识别整理方案_20260903.md》§4.1/§4.7：批量识别任务必须绑定
+背景（§4.1/§4.7）：批量识别任务必须绑定
 一个"文献类型档案"——档案 = 属性集 + 属性标注样本页 +（可选）关联模板。
 本模块只负责档案本体（属性集 CRUD + 从模板表头导入）；属性标注样本页
 由既有 manual_annotations 体系承载（行内 profile/attr 字段引用档案 id）。
@@ -10,8 +10,8 @@
 - 属性项：{"name", "desc", "synonyms": []}；输入端也接受纯字符串（自动归一）
 - 删除 → _trash/ 回收站子目录（可恢复，避开会话删除保护钩子）
 - 从模板表头导入：解析 template.sample_input 的首个非注释 CSV 行
-  （官报"公司注册表"模板 → 13+ 列属性，零手工）
-- 日志走 logging.getLogger("local_chronicles_ocr")（CLAUDE.md §约束 #5）
+  （某栏目"公司注册表"模板 → 13+ 列属性，零手工）
+- 日志走 logging.getLogger("local_chronicles_ocr")
 """
 from __future__ import annotations
 
@@ -267,7 +267,7 @@ def import_attrs_from_template(profile_id: str,
                                template_id: str,
                                profiles_dir: Path = DEFAULT_PROFILES_DIR,
                                templates_dir: Path = None) -> Optional[dict]:
-    """从模板表头一键导入属性集（§4.7b：官报 13 列 → 13 属性）。
+    """从模板表头一键导入属性集（§4.7b：模板 13 列 → 13 属性）。
 
     - 解析 template.sample_input 首个非注释 CSV 行为属性名
     - 追加档案中尚不存在的属性（去重），并回写 template_id 关联
@@ -310,7 +310,7 @@ def import_attrs_from_template(profile_id: str,
 # ===========================================================================
 # 按名称 upsert（2026-09-15 技能包第 4 步：从 app.py 提到存储层）
 # ===========================================================================
-# ★ 单一实现入口（CLAUDE.md §60）：这段编排原先**内联在 app.py**
+# ★ 单一实现入口：这段编排原先**内联在 app.py**
 #   的 `_upsert_profile_from_attrs` 里，命令面（`chronicles profile` /
 #   `chronicles project template`）够不到它 —— 于是"传模板建档案"这条
 #   渠道只有 GUI 有（用户 2026-09-14 指出的起始流程缺口）。

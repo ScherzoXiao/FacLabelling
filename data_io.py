@@ -413,7 +413,7 @@ def stem_to_project(assignments: Optional[Dict[str, str]] = None,
       image_name**（带扩展名）。不归一就会**静默漏归属** —— 换扩展名（`.jpg`）
       或改名后缀之后，"这个档案属于哪个项目"会凭空变空，且不报错。
     ★ 为什么收成单一实现：原先 `app.py` 的 `/api/seam_subjects` 内联了同样逻辑，
-      命令面再写一遍就是两份口径（`CLAUDE.md` §60）。同键取**先出现的**（保序）。
+      命令面再写一遍就是两份口径。同键取**先出现的**（保序）。
     """
     if assignments is None:
         assignments = get_all_assignments() or {}

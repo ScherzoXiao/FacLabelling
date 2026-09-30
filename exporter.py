@@ -15,7 +15,7 @@
 4. 卷号钩子：volume_of(image_name) 默认从文件名提取「卷X」，Phase 1 可换项目配置
 
 CLI 用法：
-    python exporter.py --project-id 测试用归类栏目_0e8aba
+    python exporter.py --project-id <栏目id>
     python exporter.py --structured-dir data/structured --out 学术导出.xlsx
     python exporter.py --project-id X --xlsx output.xlsx --out 带校勘列.xlsx
 """

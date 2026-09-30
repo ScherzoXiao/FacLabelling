@@ -30,7 +30,7 @@ from PIL import Image
 
 log = logging.getLogger("vlm_reader")
 
-# 分辨率档位（最长边像素；官报大字印刷 1400 ≈ 150-200dpi 可读档，
+# 分辨率档位（最长边像素；大字印刷 1400 ≈ 150-200dpi 可读档，
 # 部署冒烟原图 1895×1806 → 2060 视觉 token，缩档预期显著降 token/耗时）
 DEFAULT_MAX_SIDE = 1400
 # 2B 温度下限（贪心循环规避，§4.2）；线上档不受此约束

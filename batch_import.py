@@ -181,7 +181,7 @@ def iter_pdf_pages(pdf_path: Path, dpi: int = DEFAULT_PDF_DPI) -> Iterator[bytes
 # 命名（2026-09-02 命名规范 v2：保留用户原文件名）
 # =====================================================================
 # ✅ v2（2026-09-02）：图片保留用户原文件名（sanitize + 冲突递增），
-# PDF 多页 = `原文件名_NNNN`（页码 4 位，如 `1908年商务官报26期_0012.png`）。
+# PDF 多页 = `原文件名_NNNN`（页码 4 位，如 `样例材料_0012.png`）。
 # 旧 `_new_image_name`（P-K8 v1 时间戳命名）已移除；命名工具统一在 image_naming.py。
 
 

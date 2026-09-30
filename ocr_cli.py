@@ -5,7 +5,7 @@
 映射退出码），而 OCR 环节**没有可转发的既有 CLI**（`preannotate_gen` 是全链路编排，
 不是 OCR 入口）。按 `page_triage.py` 的先例（模块自己长命令面），本模块承担这一环。
 
-**本模块只做编排，不重造任何一环**（`CLAUDE.md` §60 单一实现）：
+**本模块只做编排，不重造任何一环**（单一实现）：
     · 引擎构造   → `preannotate_gen.build_engine()`（与 `app.init_ocr()` 同源取配置）
     · 批量提交   → `ocr_backend.prefetch()`（P-OPT-6/7 已落地的能力，**不自造并发**）
     · 结构化落盘 → `preannotate_gen.write_structured()`（唯一实现）

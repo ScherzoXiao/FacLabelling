@@ -64,7 +64,7 @@ DEFAULT_RULES_DIR = ROOT / "rules_data"
 DEFAULT_OUT_DIR = ROOT / "data" / "plans"
 
 # 跨页归并结构线的相对页高容差。
-# 实测标定（官报三页）：真结构线跨页 rel 极差 ≤0.0061，
+# 实测标定（样例三页）：真结构线跨页 rel 极差 ≤0.0061，
 # 而 0002 有一条 len=1 的短横线误检距标题线仅 0.0095 —— 两者重叠，
 # 故单靠 rel 一维聚类**分不开**；配合「簇内按页去重」才干净（见 merge_layout_boundaries）。
 REL_TOL = 0.007
@@ -285,7 +285,7 @@ def cluster_pages_by_layout(pages: List[dict],
     """按**结构线形态**把页分成版式族（单链聚类）。
 
     ★ 为什么必须分族：一个 profile 里的页未必同版式。实测 7 页里，
-    官报三页结构线两两相似度 0.75–1.0，而「联想截图_*」三页两两相似度 0
+    样例三页结构线两两相似度 0.75–1.0，而「某截图_*」三页两两相似度 0
     （它们只是文件名前缀相同）。混在一起归并 → 得到 14 条"结构线"，
     其中 9 条 support=1/7，全是单页噪声，执行器无从判断该信哪条。
 
@@ -557,7 +557,7 @@ def build_plan(profile_id: str,
         "primary_axis": "column",
         "votes": _pick(rd.get("votes"), G.get("_reading_votes"), {}),
         # P-C 补：**顺序必须可复现**。只写 `rtl_ttb` 这个名字，外部 agent 是复现
-        # 不出同款顺序的（实测：朴素「x 降序 + y 升序」在官报 0001 上恰好一致，
+        # 不出同款顺序的（实测：朴素「x 降序 + y 升序」在样例页 0001 上恰好一致，
         # 但在 0003 与 manual 页就不一致）。故把**决策程序**整体外化。
         "algorithm": {
             "id": "rtl-column-cluster-v1",
@@ -878,7 +878,7 @@ def _execution_steps(reading, page_model, record, attrs, anchoring) -> List[str]
         "这一步决定后面所有顺序，不得改变。",
         f"2. 分区定位：按 plan.page_model.layout_boundaries 的相对页高（rel × 本页高）"
         f"把整页划成 {nreg} 个区（报头 / 内容 / 页脚）。"
-        "**结构线不是记录边界** —— 实测官报版式里那条横线在**记录内部**"
+        "**结构线不是记录边界** —— 实测该版式里那条横线在**记录内部**"
         "（列内自上而下是「大字公司名 → 横线 → 属性正文」），记录跨带是常态。"
         "分区只用于：① 不产出记录的无标注区（role=unannotated_*）判位；"
         "② 决定一段文本落在哪个区（供 selector 定位）。"
@@ -1035,7 +1035,7 @@ def render_md(plan: dict) -> str:
         A(f"### 阅读序怎么算（`{alg.get('id')}`）")
         A("")
         A("**顺序必须可复现**：只写 `rtl_ttb` 这个名字是复现不出来的"
-          "（实测朴素「x 降序 + y 升序」在官报 0001 上恰好一致，0003 与 manual 页就不一致）。")
+          "（实测朴素「x 降序 + y 升序」在样例页 0001 上恰好一致，0003 与 manual 页就不一致）。")
         A("故决策程序整体外化如下：")
         A("")
         for s in (alg.get("steps") or []):

@@ -7,7 +7,7 @@
     调出页面 → 画框 / 输文本 / 自由造属性 → 递交金标准页 →
     看规则 → 看自动标注结果 → 逐条裁决 → 回写下一轮金标准。
 
-    **每条路由都转调内核模块的现有实现**（`CLAUDE.md` §60 单一实现）：
+    **每条路由都转调内核模块的现有实现**（单一实现）：
     本文件应当**零业务逻辑** —— 若这里出现一段"只有本面带才有的判断"，
     那就是 bug，不是特性。
 
@@ -37,7 +37,7 @@
 ★ 前端契约（本面**必须逐字满足**，否则 `annotate.html` 要改）
 
     页面认的是 URL 与响应形状，不是哪个后端。故路由路径与响应结构
-    **逐字沿用**（已在 `_probe/n7.txt` 逐条钉死），重写的是**代码组织**。
+    **逐字沿用**，重写的是**代码组织**。
 """
 from __future__ import annotations
 
@@ -78,7 +78,7 @@ API_TOKEN: Optional[str] = None
 # 草稿 / 裁决 / 归档 / 结构层目录：**显式传**给 adjudicate（写穿防线，2026-09-26）。
 # 缺这组全局，`/api/preannotations/*` 三条路由会回落到 adjudicate 模块默认值（= 代码根）；
 # 一旦绑到「数据根 ≠ 代码根」的部署（分发包 / 沙箱）就会写穿真实数据
-# （P1 决定性实验附带发现；修法与 `_probe/p1_thin_host` 同款）。
+# （P1 决定性实验附带发现）。
 DRAFTS_DIR: Optional[Path] = None      # 草稿层 data/preannotations
 STATUS_PATH: Optional[Path] = None     # 裁决状态 data/adjudication/status.json
 ARCHIVE_DIR: Optional[Path] = None     # 覆盖前归档 _archive

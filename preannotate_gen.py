@@ -23,7 +23,7 @@
 纪律：
   - **绝不丢字**：每页对"原始块内容 vs 解析行文本"做字符多重集核对，真丢字即报错停页
   - **落盘先备份**：覆盖 `data/structured/<stem>.json` 前先复制进 `_archive/`（可回退）
-  - **逐页隔离**：单页失败不中断整批（批量跑到第 4 页整体崩过一次，见 §CLAUDE 记录）
+  - **逐页隔离**：单页失败不中断整批（批量跑到第 4 页整体崩过一次，见 既有记录）
   - **零静默**：每页产出记录/条目/锚定率/疑错数，全部回传
 """
 from __future__ import annotations
@@ -60,7 +60,7 @@ def raw_blocks(raw_jsonl: str) -> List[tuple]:
 
     **必须拿"原始块"比"解析行"**：早前用"含 HTML 标签的原始块"直接比
     "去标签的解析文本"，把标签算成内容，误报过 90 字丢字（口径错误，
-    已在 §CLAUDE 记录）。故此处连同 `plain_text` 一起收敛为单一实现。
+    已在 既有记录）。故此处连同 `plain_text` 一起收敛为单一实现。
     """
     out: List[tuple] = []
     for ln in (raw_jsonl or "").splitlines():
@@ -390,7 +390,7 @@ def one_page(stem: str, ctx: dict) -> dict:
         details = r0.get("details") or []
         # 「整页兜底一条」是 L0 **自己承认"整页读不出"**（未找到记录起点行）——
         # 它是低置信占位，**不是成功产出**：不能让它把 `auto` 的兜底链整条短路。
-        # （2026-09-11 实测踩到：`0002_官报…_0004` L0 兜底 1 条 → `auto` 既不补 L1
+        # （2026-09-11 实测踩到：`样例材料_0004` L0 兜底 1 条 → `auto` 既不补 L1
         #   也不兜底 L2，页面就停在一条畸形记录上。修后该页 L1 重划出 4 条记录。）
         l0_failed = (not records) or bool(
             (r0.get("parse_meta") or {}).get("records_fallback"))
@@ -407,7 +407,7 @@ def one_page(stem: str, ctx: dict) -> dict:
     #   ② `auto` 且 **L0 读不出**（零产出 / 整页兜底一条）→ 先试 L1 再谈 L2：
     #      ¥0.0036/页 vs L2 ¥0.0074/页，且 L1 **不生成正文**（幻觉结构上不可能）。
     # 反面证据同样要记住：**L0 已经切对的页上 L1 零增益**（例题三页逐位打平，
-    # 见 CLAUDE.md §43）→ 所以 `auto` **绝不在 L0 成功的页上白花这笔钱**。
+    # → 所以 `auto` **绝不在 L0 成功的页上白花这笔钱**。
     if mode == "l1" or (mode == "auto" and l0_failed):
         try:
             import split_l1 as L1

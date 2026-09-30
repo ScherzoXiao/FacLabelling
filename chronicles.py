@@ -5,10 +5,10 @@
     ① 解析参数 → ② 转发给**既有 CLI**（唯一实现，不另造）→
     ③ 读回**已经落盘**的产物组装 JSON → ④ 把结果映射成有区分度的退出码。
 
-它**不复制任何业务逻辑**（几何、判据、校验一律复用既有单一实现，见 `CLAUDE.md` §60）。
+它**不复制任何业务逻辑**（几何、判据、校验一律复用既有单一实现）。
 底层 CLI 的行为、产物、路径口径一个字都不改。
 
-设计依据：`技能包程序设计_20260914.md` §4（命令面）与 §7 第 0 步。
+设计依据：命令面设计 §4 与 §7 第 0 步。
 
 为什么不是给每个模块各写一份 CLI
     既有 5 个 CLI 各自已经零交互、返回 int（§4.1 已核实）。agent 缺的不是"能跑"，
@@ -922,7 +922,7 @@ def cmd_next(a: argparse.Namespace) -> int:
       此前在命令面里**没有任何东西指向它** —— 跑完 `ocr` 之后该打开哪个页面、
       `exec` 之后草稿在哪看，全靠人自己拼 URL。用户原话：
 
-        「如果我现在换一组材料，换成县志材料，从一开始就没有金标准页，
+        「如果我现在换一组材料，换成另一批材料，从一开始就没有金标准页，
           那我要在哪里创造金标准页？」
 
     ★ 服务：本命令**仍然只探测、不起**（保持"看下一步"这个动作轻）；但
@@ -1765,7 +1765,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=0, help="只导前 N 张（0 = 全部）")
     p.add_argument("--pdf-dpi", type=int, default=None,
                    help="PDF 渲染 dpi（默认 200，钳制 72..400，与界面批量导入同口径）。"
-                        "★ OCR 质量的第一决定因素 —— 官报类竖排小字材料宜用 300+")
+                        "★ OCR 质量的第一决定因素 —— 竖排小字材料宜用 300+")
     p.add_argument("--no-recursive", action="store_true", help="目录不递归")
     p.add_argument("--dry-run", action="store_true", help="只列将导入什么，不复制")
     p.add_argument("--json", action="store_true", dest="as_json")

@@ -12,7 +12,7 @@
 于是「契约 = 版面约定的权威」这句话，在 plan 已经产出了稳定版面参数、
 而契约还没有的时候——**不成立**。本模块就是补这条路。
 
-实测样本（官报 3 页主族）：plan 里 `page_model.layout_clusters[0]`
+实测样本（样例 3 页主族）：plan 里 `page_model.layout_clusters[0]`
 有 3 条 `kind="rule"` 的结构线，`rel` = 0.1625 / 0.323 / 0.8848，
 跨 3 页 `support` = 1.0、`rel_spread` ≤ 0.0061。契约 `G` 里没有任何对应字段。
 

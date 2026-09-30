@@ -41,7 +41,7 @@
 - 学术纪律：LLM 输出若与输入字符集不一致，一律降级为 needs_review，绝不静默入库。
 
 CLI 用法：
-    python reassembler.py --project-id 测试用归类栏目_0e8aba
+    python reassembler.py --project-id <栏目id>
     python reassembler.py --image-stems a b --force-llm
     python reassembler.py --xlsx output.xlsx   # 带人工修正优先
 """

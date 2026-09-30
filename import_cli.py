@@ -22,7 +22,7 @@
 
   栏目归属**暂不在命令面**（设计稿 §8 风险表：「接口只暴露**能力**，不暴露**流程**」）。
 
-★ **不重造任何一环**（`CLAUDE.md` §60）：
+★ **不重造任何一环**：
   · 扫描 → `batch_import.scan_paths`（含 PDF 识别与 unsupported 计数）
   · 去重 → `batch_import.pixel_hash`（**像素级**，与 GUI 批量导入同一口径）
   · 命名 → `image_naming.sanitize_stem` + `unique_name`
@@ -416,7 +416,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--limit", type=int, default=0, help="只导前 N 张（0 = 全部）")
     ap.add_argument("--pdf-dpi", type=int, default=None,
                     help="PDF 渲染 dpi（默认 200，钳制 72..400 —— 与界面批量导入"
-                         "同口径）。★ 这是 OCR 质量的第一决定因素：官报类竖排小字"
+                         "同口径）。★ 这是 OCR 质量的第一决定因素：竖排小字"
                          "材料宜用 300+（见 SKILL.md 步骤 A-3）")
     ap.add_argument("--no-recursive", action="store_true",
                     help="目录不递归（默认递归，含子目录）")

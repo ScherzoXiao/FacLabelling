@@ -15,7 +15,7 @@
   · 按档案归集 → `rule_learn.gold_census`（唯一实现）
   · 图 → 项目 → `data_io.stem_to_project`（唯一实现）
   · 该页有没有 OCR → `next_step.structured_path`（唯一落点）
-⇒ 若日后做界面，界面必须是这份读数的**投影**，不能另算一遍（`CLAUDE.md` §60）。
+⇒ 若日后做界面，界面必须是这份读数的**投影**，不能另算一遍。
 
 ★ 只读：绝不写 `manual_annotations/`（受保护目录）。
 """

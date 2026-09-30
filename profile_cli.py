@@ -25,7 +25,7 @@
 ⇒ 没有 `learn` 这一步，`anchors` 为空 ⇒ `has_anchors=False` ⇒
 **整批 `unmeasurable`（退出码 3）**。这就是本模块把 `learn` 放进来的理由。
 
-★ **不重造任何一环**（`CLAUDE.md` §60）：
+★ **不重造任何一环**：
   · 建档 → `profile_store.save_profile` / `upsert_by_name` / `add_attr`
   · 模板解析 → `summary_template.extract_text` + `extract_attr_headers`
   · 学规则 → `rule_learn.learn_and_save`（纯 stdlib、零 API）
@@ -39,8 +39,8 @@
     64  用法错误
 
 用法
-    python profile_cli.py new --name 官报公司註冊 --template "<模板.xlsx>" --json
-    python profile_cli.py new --name 官报公司註冊 --attrs 公司名 注册人 资本额
+    python profile_cli.py new --name 示例栏目 --template "<模板.xlsx>" --json
+    python profile_cli.py new --name 示例栏目 --attrs 公司名 注册人 资本额
     python profile_cli.py list --json
     python profile_cli.py show --profile prof_xxx --json
     python profile_cli.py add-attr --profile prof_xxx --attr 地址
@@ -890,7 +890,7 @@ def add_subcommands(sub, func=None) -> None:
     """把全部动作挂到给定的 subparsers 对象上。
 
     ★ **单一来源**：`chronicles.py` 与本模块的 `build_parser` 都调它 ——
-      参数名与帮助文本不会在两处漂移（`CLAUDE.md` §60「勿另造平行实现」）。
+      参数名与帮助文本不会在两处漂移（「勿另造平行实现」）。
     `func` 给定 → 把 `func=<可调用>` 设进每个动作（供 `chronicles` 统一分派）；
     缺省 → 设成**动作名字符串**（供本模块 `main` 自己分派）。
     """
@@ -903,7 +903,7 @@ def add_subcommands(sub, func=None) -> None:
         p.add_argument("--json", action="store_true", dest="as_json")
 
     p = sub.add_parser("new", help="建档案（属性来自 --template 文件或 --attrs）")
-    p.add_argument("--name", required=True, help="档案名（如 官报公司註冊）")
+    p.add_argument("--name", required=True, help="档案名（如 示例栏目）")
     p.add_argument("--desc", default="", help="档案描述")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--template", default="",

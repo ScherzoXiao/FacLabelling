@@ -66,11 +66,11 @@ CONT_MAX_LEN = 3              # 续接判据：同属性相邻框中较短者的
 #
 # 为什么不是栏目（三条实测证据，2026-09-16）：
 #   ① 金标准行自带 `profile` 字段：223 行里 189 行有，**全部是真实金标准**；
-#      没有 `profile` 的 34 行 100% 是测试残留（`img1` / `联想截图_*`）。
+# 没有 `profile` 的 34 行 100% 是测试残留（`img1` / 截图类文件名）。
 #   ② `data/projects.json` 的项目**没有"类型/档案"字段**（只有 id/name/color/tags…）
 #      ⇒ 项目**声明不了**自己的文献类型，无从据此隔离。
-#   ③ 实况反例：官报金标准页归属的项目叫「**近代公司**」⇒ 项目名是**主题**、
-#      不是**类型**。同名的项目里完全可以混进县志材料。
+# ③ 实况反例：金标准页归属的项目叫「**公司注册**」⇒ 项目名是**主题**、
+# 不是**类型**。同名的项目里完全可以混进另一批材料。
 # ⇒ 「隔离轴 = 项目」在实现上站不住；**行上的 `profile` 才是随行携带的真实类型标签**。
 #
 # ★ 分界（重要）：隔离约束的是**推断口**（`facts` / `learn` —— 它们会"自己决定读什么"），
@@ -105,7 +105,7 @@ def read_gold_raw(gold_dir: Optional[Path] = None) -> Dict[str, List[dict]]:
     ★ 为什么单独立它（2026-09-16）：`load_gold`（只留 attr+text 的行）与
       `gold_facts.load_gold_boxes`（保留 attr 为空的行）原先**各自解析了一遍 jsonl**。
       两处解析 = 两处会漂移；更要命的是 —— **隔离过滤必须只挂一处**，
-      否则今天堵住了推断口，明天新加的读取口又是漏的（`CLAUDE.md` §60）。
+      否则今天堵住了推断口，明天新加的读取口又是漏的。
     """
     d = Path(gold_dir or DEFAULT_GOLD_DIR)
     if not d.is_dir():
@@ -560,7 +560,7 @@ def read_notes(notes_dir: Optional[Path] = None) -> Dict[str, List[dict]]:
 
 
 def _note_clean_text(row: dict) -> str:
-    """备注挂的原文（`商务官报（*AI看到…）`）→ `（` 前的干净文本。"""
+    """备注挂的原文（`样例材料（*AI看到…）`）→ `（` 前的干净文本。"""
     t = str(row.get("source_line_text") or "")
     for sep in ("（", "("):
         i = t.find(sep)

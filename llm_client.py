@@ -1,7 +1,7 @@
 """P-K7 LLM 客户端模块。
 
 设计要点（v5.2）：
-- 顶层 ``VALID_PROVIDERS`` 单一事实来源（Q14 + CLAUDE.md #2 对齐）
+- 顶层 ``VALID_PROVIDERS`` 单一事实来源（与 Q14 对齐）
 - api_key 优先级：环境变量（Q13 保留）＞ 本地密钥文件 data/llm_keys.json
   （v5.2 新增：分发场景 UI 写入，文件权限 0600，仅存 provider → key）
 - 支持 OpenAI 兼容协议（DeepSeek / 火山 / OpenAI / Moonshot / Qwen-API /
@@ -9,7 +9,7 @@
 - 零外部依赖（仅用 stdlib urllib.request），不增加 requirements.txt
 - 模块级 threading.RLock 保护 config 加载
 - V4-Flash thinking 模型：自动分离 reasoning_content / content
-- api_key 脱敏：前 4 后 4 字符（与 OCR 凭证一致，CLAUDE.md #1）
+- api_key 脱敏：前 4 后 4 字符（与 OCR 凭证一致）
 
 使用：
     from llm_client import get_llm_client, load_config, VALID_PROVIDERS
@@ -38,7 +38,7 @@ from llm_errors import (
 )
 
 
-# === 顶层单一事实来源（Q14 + CLAUDE.md #2）===
+# === 顶层单一事实来源（与 Q14 对齐）===
 VALID_PROVIDERS: frozenset[str] = frozenset({
     "openai_compatible",
     "ollama",
