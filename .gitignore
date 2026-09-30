@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 凭证 —— 绝不入库
+ocr_backend_config.json
+data/.api_token
+data/llm_keys.json
+data/llm_config.json
+
+# 运行时产物 —— 一律不入库
+# ★ 本仓库不附带任何预置档案 / 规则 / 画像：档案与规则由使用者在自己的副本里生成
+data/*
+inbox/
+outbox/
+inbox_annotations/
+manual_annotations/
+structured/
+divergence/
+preannotations/
+rules_data/_trash/
+_archive/
+_probe/
+_probe_out/
+*.log
+*.xlsx
+!requirements.txt

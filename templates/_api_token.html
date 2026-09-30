@@ -1,0 +1,49 @@
+// ========== 自动注入 API token 到所有非 GET 请求（单一实现，勿复制）==========
+// 启动时 GET /api/auth_token 拿 token，然后 monkey-patch window.fetch
+// 自动给 POST/PUT/DELETE 请求加 'Authorization: Bearer <token>' 头，业务代码不用动。
+//
+// ⚠ 用法：在页面 script 的**最前面**用 include 指令引入本片段。
+// 2026-09-12：原先 dashboard / annotate 各有一份，eval / review **漏了**
+// —— 后果是评测台的「评测」「跑批」「测量」三个 POST 一律 401，界面上只弹
+// 一句"unauthorized"，看着像功能没做。故抽成单一实现，四处 include。
+(function () {
+    // 用 Promise 持有 token ready 状态，所有非 GET fetch 会等这个 Promise
+    window.__apiTokenReady = fetch('/api/auth_token')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) {
+                console.error('[auth] 拿 token 失败:', d);
+                throw new Error('auth_token failed: ' + JSON.stringify(d));
+            }
+            window.__apiToken = d.token;
+            console.log('[auth] token ready: ' + d.token.slice(0, 8) + '...');
+            return d.token;
+        })
+        .catch(err => {
+            console.error('[auth] 拿 token 异常:', err);
+            return '';   // 让 fetch 401，错误会浮出来
+        });
+
+    const origFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+        init = init || {};
+        const method = (init.method || 'GET').toUpperCase();
+        if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+            return origFetch(input, init);
+        }
+        // 写操作：等 token ready 后注入 Authorization 头
+        return window.__apiTokenReady.then(token => {
+            // headers 可能是 Headers 实例 / 数组 / 普通对象 —— 统一成普通对象再注入
+            let h = init.headers || {};
+            if (typeof Headers !== 'undefined' && h instanceof Headers) {
+                h = Object.fromEntries(h.entries());
+            } else if (Array.isArray(h)) {
+                h = Object.fromEntries(h);
+            }
+            const has = Object.keys(h).some(k => k.toLowerCase() === 'authorization');
+            if (!has) { h['Authorization'] = 'Bearer ' + token; }
+            init.headers = h;
+            return origFetch(input, init);
+        });
+    };
+})();

@@ -1,0 +1,2549 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="ErvvTW9EcxPbB8EjdeWw1H">
+<head data-page-node-id="x0ILXCoip5eNznYqdiorqK">
+    <meta charset="UTF-8" data-page-node-id="LfqvFpsewKJ9vmUYKrS5Xs">
+    <title>手动标注 #{{ image_name }}</title>
+    <link rel="stylesheet" href="/static/css/bauhaus.css" data-page-node-id="BTSxsEY1GEFoKkNwTdWRUf">
+    <style>
+        * { box-sizing: border-box; }
+        html, body {
+            height: 100%; margin: 0; padding: 0;
+            font-family: 'Inter', 'Noto Sans SC', 'Microsoft YaHei', -apple-system, sans-serif;
+            background: var(--bg); color: var(--ink);
+        }
+        body { display: flex; flex-direction: column; }
+        .header {
+            background: var(--surface); padding: 10px 16px;
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+            border-bottom: 1px solid var(--border);
+            flex: 0 0 auto;
+        }
+        .header h1 {
+            margin: 0; font-size: 15px; font-weight: 600;
+            font-family: 'Noto Serif SC', 'Songti SC', serif;
+        }
+        .header .meta { color: var(--muted); font-size: 12px; }
+        .header .spacer { flex: 1; }
+        .header a { color: var(--accent); text-decoration: none; font-size: 12px; }
+        .header a:hover { text-decoration: underline; }
+        .header .zoom-info {
+            background: var(--bg); padding: 4px 10px;
+            font-size: 12px; color: var(--muted);
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            border: 1px solid var(--border);
+        }
+        .mode-btn {
+            background: var(--surface); color: var(--ink);
+            border: 1px solid var(--border);
+            padding: 6px 14px; cursor: pointer; font-size: 12px;
+            font-family: inherit;
+        }
+        .mode-btn:hover { border-color: var(--subtle); }
+        .main {
+            flex: 1; overflow: auto; padding: 20px;
+            display: flex; align-items: flex-start; justify-content: center;
+        }
+        .img-wrap {
+            position: relative; display: inline-block; user-select: none;
+            background: #fff; padding: 0;
+            border: 1px solid var(--border);
+        }
+        .img-wrap img { display: block; }
+        .img-wrap svg {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            cursor: crosshair;
+        }
+        /* P1d-ui（2026-09-06）：自动模式——拖拽即画框、单击框即选中，光标统一 crosshair */
+        .img-wrap .box-rect { cursor: pointer; }
+        .draft-rect {
+            fill: rgba(31, 30, 27, 0.15);
+            stroke: var(--ink); stroke-width: 2; stroke-dasharray: 4 2;
+        }
+        .saved-rect {
+            fill: rgba(184, 92, 74, 0.10);
+            stroke: var(--accent); stroke-width: 2;
+        }
+        /* P1d：续框组（跨列截断的同一条属性标注）——短划线提示"这是一组" */
+        .grouped-rect { stroke-dasharray: 9 4; }
+        /* P1d-post：归组选择模式中已点选的框（绿粗短划线 + 序号标签） */
+        .picked-rect {
+            stroke: var(--success) !important; stroke-width: 3;
+            stroke-dasharray: 9 4;
+            fill: rgba(125, 155, 106, 0.18) !important;
+        }
+        .selected-rect { stroke-width: 3 !important; }
+        .pending-rect {
+            fill: rgba(125, 155, 106, 0.22);
+            stroke: var(--success); stroke-width: 2;
+            animation: pulse 1.2s ease-in-out infinite;
+        }
+
+        /* OCR 参考框（未校对：赭红虚线；已校对：柔绿实线） */
+        .ocr-rect {
+            fill: rgba(184, 92, 74, 0.05);
+            stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 6 3;
+            cursor: pointer;
+        }
+        .ocr-corrected-rect {
+            fill: rgba(125, 155, 106, 0.12);
+            stroke: var(--success); stroke-width: 2;
+            cursor: pointer;
+        }
+        .ocr-selected-rect { stroke-width: 3 !important; }
+        .ocr-label {
+            fill: #fff; stroke: var(--accent); stroke-width: 1;
+            font-size: 11px; font-family: 'Microsoft YaHei', sans-serif;
+            font-weight: 500;
+        }
+        .ocr-corrected-label {
+            fill: #fff; stroke: var(--success); stroke-width: 1;
+            font-size: 11px; font-family: 'Microsoft YaHei', sans-serif;
+            font-weight: 500;
+        }
+
+        /* ===== P4（2026-09-10）：草稿层 + 裁决面板（半自动标注通用方案 §5 P4）=====
+           三层靠**线型与色系**区分，不新增颜色（守包豪斯 8 色 token）：
+             OCR 参考 = 赭红 6-3 虚线 · 已保存 = 赭红实线 2
+             草稿     = 灰系（muted 待裁 / success 已采纳 / subtle 已忽略） */
+        .ai-rect {
+            fill: rgba(111, 108, 100, 0.05);
+            stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 3 3;
+            cursor: pointer;
+        }
+        .ai-rect:hover { fill: rgba(111, 108, 100, 0.16); }
+        .ai-rect.accepted {
+            stroke: var(--success); stroke-dasharray: none; stroke-width: 2;
+            fill: rgba(125, 155, 106, 0.10);
+        }
+        .ai-rect.rejected {
+            stroke: var(--subtle); stroke-dasharray: 2 4; fill: none;
+        }
+        .ai-rect.focused { stroke-width: 3; }
+        .ai-label {
+            fill: #fff; stroke: var(--muted); stroke-width: 1;
+            font-size: 11px; font-family: 'Microsoft YaHei', sans-serif;
+            font-weight: 600;
+        }
+        .ai-label.accepted { stroke: var(--success); }
+        .ai-label.rejected { stroke: var(--subtle); fill: var(--subtle); }
+
+        /* 裁决面板：右侧**固定定位**，不参与 .main 的 flex
+           → 面板开关对既有画框布局零影响（向后兼容） */
+        .draft-panel {
+            position: fixed; top: 0; right: 0; bottom: 0; width: 376px;
+            background: var(--surface); border-left: 1px solid var(--border);
+            display: none; flex-direction: column; z-index: 40;
+        }
+        .draft-panel.open { display: flex; }
+        body.draft-open .main { padding-right: 396px; }
+        .dp-head {
+            display: flex; align-items: center; gap: 8px;
+            padding: 9px 12px; border-bottom: 1px solid var(--border);
+        }
+        .dp-title { font-size: 13px; font-weight: 600; }
+        .dp-count { font-size: 11.5px; color: var(--muted);
+                    font-family: 'SFMono-Regular', Consolas, monospace; }
+        .dp-head .spacer { flex: 1; }
+        .dp-x { border: 1px solid var(--border); background: var(--surface);
+                color: var(--ink); width: 24px; height: 24px; cursor: pointer;
+                font-size: 12px; line-height: 1; }
+        .dp-x:hover { border-color: var(--ink); }
+        .dp-stats { display: flex; border-bottom: 1px solid var(--border); }
+        .dp-stat { flex: 1; padding: 7px 10px; border-right: 1px solid var(--border); }
+        .dp-stat:last-child { border-right: none; }
+        .dp-stat b { display: block; font-size: 16px; font-weight: 600; }
+        .dp-stat span { font-size: 11px; color: var(--muted); }
+        /* P4 验收口径（操作次数下降率）——实时可见，非事后报告 */
+        .dp-ops { padding: 5px 10px; font-size: 11px; color: var(--muted);
+                  border-bottom: 1px solid var(--border); background: var(--bg); }
+        .dp-ops b { color: var(--text); font-weight: 600; }
+        .dp-ops .ok { color: var(--success); font-weight: 600; }
+        .dp-ops .no { color: var(--muted); font-weight: 600; }
+        /* L0（规则切分）页级自检：把"这页整体读得如何"摆在最上面 —— 低置信页
+           优先复核，未覆盖字符必须可见（绝不丢字）。无旁证则整条隐藏。 */
+        .dp-l0 { display: none; padding: 4px 10px; font-size: 11px; line-height: 1.6;
+                 border-bottom: 1px solid var(--border); border-left: 3px solid var(--success);
+                 background: var(--surface); color: var(--muted); }
+        .dp-l0.on { display: block; }
+        .dp-l0.warn { border-left-color: var(--accent); color: var(--accent); }
+        /* 三视图③：局部放大（CSS 背景裁切，零后端裁图） */
+        .dp-loupe {
+            height: 168px; border-bottom: 1px solid var(--border);
+            background-color: var(--bg); background-repeat: no-repeat;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--subtle); font-size: 12px; overflow: hidden;
+        }
+        .dp-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px;
+                      border-bottom: 1px solid var(--border); }
+        .dp-actions button {
+            flex: 1; border: 1px solid var(--ink); background: var(--ink); color: #fff;
+            padding: 6px 8px; font-size: 12px; cursor: pointer;
+        }
+        .dp-actions button:disabled {
+            background: var(--surface); color: var(--subtle);
+            border-color: var(--border); cursor: default;
+        }
+        /* 安全门说明：禁用必须给理由，否则用户会以为是 bug */
+        .dp-gate { flex-basis: 100%; display: none; font-size: 11px; line-height: 1.5;
+                   color: var(--muted); border-left: 3px solid var(--border);
+                   padding: 4px 8px; background: var(--surface); }
+        .dp-gate.on { display: block; }
+        .dp-gate b { color: var(--text); }
+        /* P5 逃生门：登记 variant 的入口（**只有人工点击才会提交**） */
+        .dp-var-btn { display: block; margin-top: 5px; padding: 4px 8px;
+                      font-size: 11px; cursor: pointer; background: var(--surface);
+                      color: var(--text); border: 1px solid var(--ink); }
+        .dp-list { flex: 1; overflow-y: auto; }
+        .dp-item { border-bottom: 1px solid var(--border); padding: 9px 12px;
+                   cursor: pointer; }
+        .dp-item:hover { background: var(--ink-tint); }
+        .dp-item.focused { background: var(--ink-tint);
+                           border-left: 3px solid var(--ink); padding-left: 9px; }
+        .dp-item.accepted, .dp-item.rejected { opacity: 0.55; }
+        .dp-row1 { display: flex; align-items: center; gap: 6px; }
+        .dp-sq { width: 8px; height: 8px; flex-shrink: 0; background: var(--muted); }
+        .dp-item.accepted .dp-sq { background: var(--success); }
+        .dp-item.rejected .dp-sq { background: var(--subtle); }
+        .dp-attr { font-size: 12px; font-weight: 600; }
+        .dp-attr.noname { color: var(--muted); font-weight: 400; }
+        /* 改属性（2026-09-26）：属性名可点击 → 契约属性下拉。虚线下划线 = 可点信号 */
+        .dp-attr.editable { cursor: pointer; border-bottom: 1px dashed var(--muted); }
+        .dp-attr.editable:hover { color: var(--ink); border-bottom-color: var(--ink); }
+        .dp-conf { font-size: 10px; border: 1px solid var(--border);
+                   color: var(--muted); padding: 0 4px; margin-left: auto; }
+        .dp-conf.high { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+        /* 飞轮（2026-09-11）：规则校验结论。SUSPECT = 系统自己怀疑读错 →
+           必须**可见且可解释**（title 挂着规则给的原因），不能只降个置信度了事 */
+        .dp-rule { font-size: 10px; border: 1px solid var(--muted); color: var(--muted);
+                   padding: 0 4px; cursor: help; }
+        .dp-rule.suspect { border-color: #b00; color: #b00; font-weight: 600; }
+        /* 红线二（三视图）：VLM 值 / OCR 原文**并排**对照，差异字标出 —— 防盲签 */
+        .dp-tri { display: grid; grid-template-columns: 28px 1fr;
+                  gap: 2px 6px; margin-top: 4px; align-items: baseline; }
+        .dp-k { font-size: 10px; color: var(--subtle);
+                font-family: 'SFMono-Regular', Consolas, monospace; }
+        .dp-vlm { font-size: 14px; word-break: break-all; }
+        .dp-ocr { font-size: 11.5px; color: var(--muted); word-break: break-all;
+                  display: -webkit-box; -webkit-line-clamp: 2;
+                  -webkit-box-orient: vertical; overflow: hidden; }
+        .dp-diff { background: var(--accent-tint); color: var(--accent);
+                   font-style: normal; border-bottom: 1px solid var(--accent); }
+        .dp-hit { background: var(--success-tint); border-bottom: 1px solid var(--success); }
+        .dp-rest { color: var(--subtle); }
+        .dp-meta { font-size: 11px; color: var(--subtle); margin-top: 2px; }
+        /* M5 分段视图（折叠 + 展开可见各段）：多段续接是本语料常态（RTL 竖版
+           一列写到底即接下一列），折叠后每条逻辑值只占一行；展开逐段核对。
+           纯包豪斯：1px 描边、无圆角、无阴影、等宽数字标签。 */
+        .dp-fold { border: 1px solid var(--border); background: var(--surface);
+                   color: var(--ink); padding: 0 5px; font-size: 10.5px; cursor: pointer;
+                   font-family: 'SFMono-Regular', Consolas, monospace; }
+        .dp-fold:hover { border-color: var(--ink); }
+        .dp-fold.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+        .dp-segs { margin-top: 6px; border: 1px solid var(--border); }
+        .dp-seg { display: grid; grid-template-columns: 34px 1fr; gap: 2px 6px;
+                  padding: 4px 6px; border-bottom: 1px solid var(--border);
+                  cursor: pointer; }
+        .dp-seg:last-child { border-bottom: none; }
+        .dp-seg:hover { background: var(--ink-tint); }
+        .dp-seg.picked { background: var(--accent-tint);
+                         border-left: 3px solid var(--accent); padding-left: 3px; }
+        .dp-seg-n { font-size: 10px; color: var(--subtle);
+                    font-family: 'SFMono-Regular', Consolas, monospace; }
+        .dp-seg-t { font-size: 13px; word-break: break-all; }
+        .dp-seg-m { grid-column: 2; font-size: 10px; color: var(--subtle);
+                    font-family: 'SFMono-Regular', Consolas, monospace; }
+        .dp-seg-o { grid-column: 2; font-size: 10.5px; color: var(--muted);
+                    word-break: break-all; }
+        .dp-seg-sum { padding: 3px 6px; font-size: 10px; color: var(--subtle);
+                      border-top: 1px solid var(--border);
+                      font-family: 'SFMono-Regular', Consolas, monospace; }
+        .dp-seg-sum.ok { color: var(--success); }
+        .dp-seg-sum.bad { color: var(--accent); }
+        .ai-seg-rect { fill: none; stroke: var(--accent); stroke-width: 1;
+                       stroke-dasharray: 2 2; pointer-events: none; }
+        .ai-seg-rect.picked { stroke-width: 3; stroke-dasharray: none; }
+        .ai-seg-label { fill: var(--accent); font-size: 10px;
+                        font-family: 'SFMono-Regular', Consolas, monospace; }
+        .dp-btns { display: flex; gap: 4px; margin-top: 7px; }
+        .dp-btns button {
+            border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+            padding: 3px 10px; font-size: 11.5px; cursor: pointer;
+        }
+        .dp-btns button:hover { border-color: var(--ink); }
+        .dp-btns button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+        /* 页级备注（2026-09-26）：给 AI 的提醒通道，落 manual_annotations/notes/，
+           不进金标准文本。面板底部固定区，只追加。 */
+        .dp-notes { border-top: 1px solid var(--border); background: var(--bg);
+                    padding: 8px 12px; }
+        .dp-notes-head { font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+        .dp-notes-head span { font-weight: 400; color: var(--muted); font-size: 11px; }
+        .dp-notes-list { max-height: 120px; overflow-y: auto; margin-bottom: 6px; }
+        .dp-note { font-size: 11.5px; line-height: 1.5; padding: 3px 0;
+                   border-bottom: 1px dashed var(--border); color: var(--muted); }
+        .dp-note:last-child { border-bottom: none; }
+        .dp-note .nb { font-size: 10px; border: 1px solid var(--border);
+                       padding: 0 3px; margin-right: 4px; color: var(--subtle); }
+        .dp-notes-form { display: flex; gap: 5px; align-items: center; }
+        .dp-notes-form input[type="text"] {
+            flex: 1; min-width: 0; border: 1px solid var(--border); background: var(--surface);
+            color: var(--ink); padding: 4px 8px; font-size: 12px; font-family: inherit;
+        }
+        .dp-notes-form label { font-size: 10.5px; color: var(--muted); white-space: nowrap;
+                               cursor: pointer; user-select: none; }
+        .dp-notes-form button {
+            border: 1px solid var(--ink); background: var(--ink); color: #fff;
+            padding: 4px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
+            white-space: nowrap;
+        }
+        .dp-notes-empty { font-size: 11px; color: var(--subtle); }
+        .dp-hint { padding: 8px 12px; border-top: 1px solid var(--border);
+                   font-size: 11px; color: var(--subtle); line-height: 1.6; }
+        .mode-btn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1.0; }
+        }
+        .box-label {
+            fill: #fff; stroke: var(--accent); stroke-width: 1.5;
+            font-size: 13px; font-weight: 600; font-family: 'Microsoft YaHei', sans-serif;
+        }
+        .pending-label {
+            fill: #fff; stroke: var(--success); stroke-width: 1.5;
+            font-size: 14px; font-weight: 600; font-family: 'Microsoft YaHei', sans-serif;
+        }
+
+        /* 底部固定输入栏 */
+        .input-bar {
+            flex: 0 0 auto;
+            background: var(--surface); padding: 12px 16px;
+            border-top: 2px solid var(--border);
+            display: flex; align-items: center; gap: 12px;
+        }
+        .input-bar.disabled { border-top-color: var(--border); opacity: 0.55; }
+        .input-bar .status { color: var(--muted); font-size: 12px; min-width: 200px; }
+        .input-bar .status b { color: var(--ink); }
+        .input-bar .status.pending { color: var(--success); }
+        .input-bar .status.pending b { color: var(--success); }
+        .input-bar input {
+            flex: 1; padding: 10px 14px;
+            background: var(--surface); color: var(--ink);
+            border: 1px solid var(--border);
+            font-size: 16px; font-family: 'Microsoft YaHei', sans-serif;
+        }
+        .input-bar input:focus { outline: none; border-color: var(--success); }
+        .input-bar input:disabled { border-color: var(--border); color: var(--subtle); background: var(--bg); }
+        .input-bar button {
+            padding: 10px 18px; border: 1px solid transparent;
+            cursor: pointer; font-size: 13px; font-weight: 500;
+            font-family: inherit;
+            background: var(--ink); color: #fff;
+        }
+        .input-bar button:hover:not(:disabled) { background: #3A3833; }
+        .input-bar button:disabled { background: var(--subtle); cursor: not-allowed; }
+        .input-bar .btn-danger { background: var(--accent); }
+        .input-bar .btn-danger:hover:not(:disabled) { background: #A04E3E; }
+        .input-bar .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
+        .input-bar .btn-secondary:hover:not(:disabled) { background: var(--bg); }
+
+        /* P1d-easy：底栏"说明"弹层（复用 bauhaus.css 的 btn-info/info-pop，向上弹出） */
+        .input-bar { position: relative; }
+        .input-bar button.btn-info {
+            background: var(--surface); color: var(--muted);
+            border: 1px solid var(--border); padding: 10px 14px;
+        }
+        .input-bar button.btn-info:hover { background: var(--bg); color: var(--ink); }
+        .input-bar button.btn-info.open { background: var(--ink); color: #fff; border-color: var(--ink); }
+        .input-bar .info-pop.help-pop {
+            top: auto; right: 12px; bottom: calc(100% - 6px);
+            width: min(560px, calc(100% - 24px));
+        }
+
+        /* ===== P1a（2026-09-04）：档案/属性选择器（方案 §4.7）===== */
+        .input-bar select, .header select {
+            background: var(--surface); color: var(--ink);
+            border: 1px solid var(--border);
+            font-family: inherit; cursor: pointer;
+        }
+        .input-bar select {
+            padding: 9px 8px; font-size: 14px; max-width: 176px; flex: 0 0 auto;
+        }
+        .input-bar select:disabled { color: var(--subtle); background: var(--bg); cursor: not-allowed; }
+        .header select { padding: 5px 8px; font-size: 12px; max-width: 230px; }
+
+        /* P1a：档案管理弹窗（Bauhaus：2px 描边面板，无圆角无阴影） */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 9000;
+            background: rgba(31, 30, 27, 0.45);
+            display: none; align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: var(--surface); border: 2px solid var(--ink);
+            width: 600px; max-width: 92vw; max-height: 82vh;
+            display: flex; flex-direction: column;
+        }
+        .modal .modal-head {
+            padding: 12px 16px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 10px;
+            font-weight: 600; font-size: 14px;
+        }
+        .modal .modal-head .spacer { flex: 1; }
+        .modal .modal-body { padding: 14px 16px; overflow-y: auto; font-size: 13px; }
+        .modal .modal-body h4 {
+            margin: 16px 0 8px; font-size: 12px; color: var(--muted); font-weight: 600;
+        }
+        .modal .modal-body h4:first-child { margin-top: 0; }
+        .prof-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 10px; border: 1px solid var(--border); margin-bottom: 6px;
+        }
+        .prof-row.active { border: 2px solid var(--ink); padding: 7px 9px; }
+        .prof-row .prof-name { font-weight: 600; }
+        .prof-row .prof-attrs {
+            color: var(--muted); flex: 1; font-size: 12px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .modal .btn-mini {
+            background: var(--surface); color: var(--ink);
+            border: 1px solid var(--border); padding: 4px 10px;
+            font-size: 12px; cursor: pointer; font-family: inherit;
+        }
+        .modal .btn-mini:hover { border-color: var(--ink); }
+        .modal .btn-mini.btn-primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+        .modal .btn-mini.btn-danger { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+        .modal .form-row { display: flex; gap: 8px; margin-bottom: 8px; }
+        .modal .form-row input, .modal .form-row select {
+            flex: 1; padding: 7px 9px; font-size: 13px;
+            border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+            font-family: inherit;
+        }
+        /* 内联输入弹窗（ask-modal）：说明可换行（\n），动作右对齐 */
+        .modal .ask-msg { color: var(--muted); font-size: 12px; margin-bottom: 8px; white-space: pre-line; }
+        .modal .ask-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    </style>
+</head>
+<body data-page-node-id="g3LbSy2IYROMwKulsTvRtK">
+    <div class="header" data-page-node-id="I2gHT2RrhjScVCvWqciVBp">
+        <h1 data-page-node-id="uxyTnm0tfYdWmN4OAGTqJs">手动标注 — {{ image_name }}</h1>
+        <span class="meta" data-page-node-id="N6qx0VH1MZivHOxdcgxWGz">
+            <span id="count" data-page-node-id="UGS0xrVU6M4nH0UVTLkgLA">0</span> 条已标 ·
+            <span id="attr-count" style="color:var(--muted);" data-page-node-id="OvxlAXyeCB6mUMOBbngAOd">0</span> 属性 ·
+            缩放 <span class="zoom-info" id="zoom-info" data-page-node-id="DA1pXLO0XcdE1chj8fgjKf">100%</span>
+        </span>
+        <div class="spacer" data-page-node-id="7VUsTIez9F1TCmZnEBUVro"></div>
+        <!-- P1a：档案绑定（属性集来源）与档案管理 -->
+        <select id="profile-select" onchange="onProfileChange(this.value)"
+                title="文献类型档案：属性下拉与着色的来源" data-page-node-id="gt86m4Or7yHIS63rr6ieFX">
+            <option value="" data-page-node-id="cXfv0Se0M1Xikw7RgLEdvc">未绑定档案</option>
+        </select>
+        <button class="mode-btn" onclick="openProfileModal()"
+            style="cursor:pointer; font-size:12px; margin-right:4px;" data-page-node-id="F45WA9N4gyyxCAPMjFBjWF">档案管理</button>
+        <label style="font-size:12px; color:var(--muted); margin-right:8px; user-select:none; cursor:pointer;" data-page-node-id="EbbQm48nA4op8ml1GCBeLU">
+            <input type="checkbox" id="show-ocr" checked onchange="toggleOcrVisibility(this.checked)" style="vertical-align:middle;" data-page-node-id="Ay3fyM3Ohe45jzVVtCVmd9">
+            显示 OCR 参考框
+            <span id="ocr-count" style="color:var(--subtle); margin-left:2px;" data-page-node-id="HVmS79wmUTvOlZoL2fAj1H">(0)</span>
+            <span id="ocr-corrected-count" style="color:var(--success); margin-left:4px;" data-page-node-id="VYCtQRfLfRd826tS5npRjA"></span>
+        </label>
+        <!-- P4（2026-09-10）：草稿层——AI 提议的属性框，待人工裁决（方案 §5 P4）。
+             无草稿的页面整组隐藏，不影响既有画框工作流。 -->
+        <label id="show-ai-wrap" style="display:none; font-size:12px; color:var(--muted); margin-right:8px; user-select:none; cursor:pointer;">
+            <input type="checkbox" id="show-ai" checked onchange="toggleAiVisibility(this.checked)" style="vertical-align:middle;">
+            显示草稿框
+            <span id="ai-count" style="color:var(--subtle); margin-left:2px;">(0)</span>
+        </label>
+        <button class="mode-btn" id="btn-ai" style="display:none;" onclick="toggleDraftPanel()"
+            title="草稿裁决：AI 提议的属性框 → 通过 / 修正 / 忽略（P4）">草稿裁决 <span id="btn-ai-n">0</span></button>
+        <!-- P1d-ui（2026-09-06）：收尾功能上移顶栏——归组/跨页是"全部标完后的统一收尾"，
+             不放输入栏以免诱导用户画框后立即调用；画框/浏览按钮删除，改自动模式 -->
+        <select id="xpage" title="收尾阶段：跨页续接标记。承上页=上一页末条记录的延续（通常标在下一页开头）；接下页=本记录延续到下一页（通常标在本页末尾被截断的属性上）。选中已有框后设置并 Enter 保存，保存后自动复位">
+            <option value="">跨页：无</option>
+            <option value="prev">跨页：承上页</option>
+            <option value="next">跨页：接下页</option>
+        </select>
+        <button class="mode-btn" id="btn-cont" disabled
+            title="收尾阶段：全部标完后统一归组——依次点击要归为一条的标注框（点击顺序=拼接顺序），属性取首框，N/Enter 完成，Esc 取消">续框 (N)</button>
+        <!-- 2026-09-07：删除"← 返回 dashboard"链接——桌面壳下手动标注是独立窗口，
+             退出应走窗口右上角关闭；网页内跳转会另开进程，属网页版遗留 -->
+    </div>
+
+    <!-- 2026-08-18：OCR 进度 banner（OCR 识别中显示黄色提示，强制等完成再显示红框） -->
+    <div id="ocr-progress-banner" style="
+        display: none;
+        padding: 10px 18px;
+        background: var(--success-tint);
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 500;
+        border-bottom: 2px solid var(--success);
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 12px;
+    " data-page-node-id="lVxmXUW5okHbN0FItdlkAd">
+        <span id="ocr-progress-text" style="flex: 1;" data-page-node-id="xyuvstRyJXXUhrRyw2gxiR">OCR 识别中…</span>
+        <button id="ocr-progress-refresh" onclick="loadOcrRecords()" style="
+            background: var(--surface);
+            color: var(--ink);
+            border: 1px solid var(--border);
+            padding: 4px 12px;
+            cursor: pointer;
+            font-size: 12px;
+        " data-page-node-id="eVVTtW202ZRXs3ni8XHhdY">刷新</button>
+    </div>
+
+    <div class="main" data-page-node-id="nmzBxC9xe07vLRRgmx5tDP">
+        <div class="img-wrap" id="img-wrap" data-page-node-id="4212ZfC1ePEmDXCETkDfLC">
+            <img id="src-img" src="/annotate_raw/{{ image_name }}" alt="原图" data-page-node-id="HwH10mWmj8WtDeZx2iM66p">
+            <svg id="overlay" xmlns="http://www.w3.org/2000/svg" data-page-node-id="463e8Fm03d7EmqsaaIIw0j"></svg>
+        </div>
+    </div>
+
+    <div class="input-bar disabled" id="input-bar" data-page-node-id="qJ4VBovr7Sm9WgOxmIOdFc">
+        <div class="status" id="input-status" data-page-node-id="haC28wEzCdepRExtXZsJuA">拖拽画框 · 单击已有框编辑 · 点空白取消 · 续框/跨页=收尾（顶栏）</div>
+        <!-- P1a：属性选择（绑定档案后启用；选中后保存即带属性；OCR 框选中时=转存属性标注） -->
+        <select id="attr" disabled onchange="onAttrChange(this.value)"
+                title="属性（Alt+1..9 快选最近用过的属性）" data-page-node-id="2iVwkZCZ9hklVlA3mL1dlo">
+            <option value="" data-page-node-id="6sDmBvmsMySqind3GmWhtx">不标属性</option>
+        </select>
+        <input id="text" type="text" placeholder="先画框，这里输入文字..." disabled
+               autocomplete="off" spellcheck="false" data-page-node-id="KwOGtHc5HNGXV7OWyhYBSx">
+        <button id="btn-save" disabled data-page-node-id="dsA3uy6JU8VcTzIEctle4x">保存 (Enter)</button>
+        <button id="btn-del" class="btn-danger" disabled data-page-node-id="g3tonDD35zv4BISMeFtwi4">删除 (Del)</button>
+        <button id="btn-cancel" class="btn-secondary" disabled data-page-node-id="vPP9H1UZeFVMIMrYLrihV0">取消 (Esc)</button>
+        <!-- P1d-ui：续框/跨页已上移顶栏（收尾阶段语义），输入栏只留 录入三键 -->
+        <!-- P1d-easy：快捷键说明收纳进"说明"弹层（同知识卡片/设置页 btn-info/info-pop 方案） -->
+        <button class="btn-info" onclick="toggleHelp(event)" data-page-node-id="fNQpVn0PKj1b0ZY5oahC7R">说明</button>
+        <div class="info-pop help-pop" id="help-pop">
+            <div class="ip-head">标注快捷键与流程<span class="spacer"></span><button class="ip-close" onclick="closeHelp()">✕</button></div>
+            <div class="ip-body">
+                <p><span class="ip-k">画框标注（自动模式）</span>：无需切换模式——<b>按住拖拽</b>即画框，输文字后 Enter 保存；<b>单击</b>已有框即选中编辑，点空白处取消选中。选属性后保存即带属性，<b>Alt+数字</b> 快选最近用过的属性。</p>
+                <p><span class="ip-k">跨列续框（事后归组·收尾用）</span>：<b>全部标完后</b>用顶栏 <b>续框</b>（或按 N）进入归组模式，<b>依次点击</b>要归为一条的标注框（点击顺序=拼接顺序，绿虚线+序号标记，再点取消），<b>N / Enter / 再点按钮完成归组</b>，Esc 取消。属性取首框（首框无属性则取组内第一个非空）；事后改组内任一段属性即传播整组。重新框选旧组再归组 = 改组。</p>
+                <p><span class="ip-k">OCR 参考框</span>：点击选中；选属性 + Enter = 转存为属性标注（已校对文本优先预填）；不选属性 + Enter = 改字写回 xlsx。</p>
+                <p><span class="ip-k">跨页续接（收尾用·顶栏下拉）</span>：一条记录被页底截断、其余部分在下一页开头时——本页末尾被截断的属性选「<b>接下页</b>」，下一页开头的延续段落选「<b>承上页</b>」（可与跨列归组叠加：组内任一段设置即传播整组）。画布角标：↑=承上页，↓=接下页。保存后下拉自动复位，不会粘到下一条。</p>
+                <p><span class="ip-k">编辑 / 撤销</span>：点击已存框改字换属性；<b>Del</b> 删除；<b>Ctrl+Z</b> 撤销删除。</p>
+                <p><span class="ip-k">Esc</span>：有待输框时取消本框（续框保持）；其余情况退出续框 / 取消选中。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- P4（2026-09-10）：草稿裁决面板——三视图之一/之二（列表 + 局部放大），
+         第三个视图是画布上的草稿框层本身。固定右侧，不参与主区 flex。 -->
+    <aside class="draft-panel" id="draft-panel">
+        <div class="dp-head">
+            <span class="dp-title">草稿裁决</span>
+            <span class="dp-count" id="dp-count">0 / 0</span>
+            <span class="spacer"></span>
+            <button class="dp-x" onclick="toggleDraftPanel(false)" title="关闭（不影响已裁决结果）">✕</button>
+        </div>
+        <div class="dp-stats" id="dp-stats"></div>
+        <div class="dp-ops" id="dp-ops" title="方案 §6 验收口径：单页人工操作次数较全手工下降 ≥ 80%。批量口径 = 先一键采纳全部高置信（记 1 次），其余逐条。"></div>
+        <div class="dp-l0" id="dp-l0"></div>
+        <div class="dp-loupe" id="dp-loupe">点选草稿条目 → 此处放大原图对应区域</div>
+        <div class="dp-actions">
+            <button id="dp-batch" onclick="aiBatchHigh()" title="一键采纳当前页全部高置信草稿（1 次操作替代逐条点击）">一键采纳全部高置信 (<span id="dp-batch-n">0</span>)</button>
+            <div class="dp-gate" id="dp-gate"></div>
+        </div>
+        <div class="dp-list" id="dp-list"></div>
+        <!-- 页级备注（2026-09-26）：给 AI 的提醒（如「跨页内容勿纳入规则」），
+             落 manual_annotations/notes/，只追加；不进金标准文本。 -->
+        <div class="dp-notes" id="dp-notes">
+            <div class="dp-notes-head">给 AI 的备注 <span id="dp-notes-n"></span><span>（存 notes/，不进金标准文本）</span></div>
+            <div class="dp-notes-list" id="dp-notes-list"></div>
+            <div class="dp-notes-form">
+                <input id="dp-note-input" type="text" autocomplete="off" spellcheck="false"
+                       placeholder="提醒 AI，如：这是跨页内容，勿纳入规则">
+                <label title="附带当前选中草稿条目的框，方便 AI 定位是哪一条">
+                    <input type="checkbox" id="dp-note-with-box" checked style="vertical-align:middle;"> 附条目框</label>
+                <button onclick="aiSaveNote()">存备注</button>
+            </div>
+        </div>
+        <div class="dp-hint">
+            快捷键：<b>↑ ↓</b> 选条 · <b>Enter</b> 通过 · <b>X</b> 忽略 · <b>E</b> 修正值。<br>
+            采纳即固化：写入 <code>manual_annotations/</code>（<code>source=ai_verified</code>），
+            撤销走本条「撤回」；草稿文件本身永不被改写（方案 §7 红线二）。
+        </div>
+    </aside>
+
+    <!-- P1a：档案管理弹窗 -->
+    <div class="modal-overlay" id="profile-modal" data-page-node-id="8qCW9JCWJ0Gx47S8F4thCT">
+        <div class="modal" data-page-node-id="OZ7GnRh269gBcV9OSKICdN">
+            <div class="modal-head" data-page-node-id="KlhaPbpKAxxpkwAanoua1Z">
+                档案管理（文献类型档案 = 属性集 + 属性标注样本页）
+                <span class="spacer" data-page-node-id="YMYGoA4u6SACRjcJzWyZv4"></span>
+                <button class="btn-mini" onclick="closeProfileModal()" data-page-node-id="iSQsYxNcighxcrLXl49oRX">关闭</button>
+            </div>
+            <div class="modal-body" data-page-node-id="TflqS1bGyxO24LA7c14xPr">
+                <h4 data-page-node-id="kTQ9srCU4XTASFlOHI1qNl">档案列表 — 点击「绑定」后，属性下拉与标注着色取自该档案</h4>
+                <div id="prof-list" data-page-node-id="RiKCUgjGZOJL8tifPf3K3Z"></div>
+                <h4 data-page-node-id="hKGp44qnnLD3nvxZdu7spw">新建档案</h4>
+                <div class="form-row" data-page-node-id="qbaEb5tuD4jwiqdQ8igbAv">
+                    <input id="new-prof-name" placeholder="档案名，如：某类文献档案" data-page-node-id="64GdoYdBqmsIarskqQVsE9">
+                </div>
+                <div class="form-row" data-page-node-id="CsxlirNxghPeOGueM02yWC">
+                    <input id="new-prof-desc" placeholder="描述（可空），如：该类文献的来源与年代" data-page-node-id="QZhgtZ0ZOLBIiL4cM1WRpa">
+                </div>
+                <div class="form-row" data-page-node-id="QdFApktrhQgHkO1PUNd5US">
+                    <button class="btn-mini btn-primary" onclick="createProfile()" data-page-node-id="MH6bztkihgq9zhR7Z6VO1h">创建并绑定</button>
+                </div>
+                <h4 data-page-node-id="JZjx0MMwtuyenfUGZDLKJE">从模板表头导入属性集 — 表头几列就建几个属性，零手工</h4>
+                <div class="form-row" data-page-node-id="ATkfQT0zHtV1S8Con66sbP">
+                    <select id="tmpl-select" data-page-node-id="3TCBI8S9Mmb02YbFuCCBfK"></select>
+                    <button class="btn-mini btn-primary" onclick="importTemplateToBound()" data-page-node-id="x3yeOw3rX6PxpnBM3yCNDl">导入到当前绑定档案</button>
+                </div>
+                <div style="color:var(--muted); font-size:12px;" data-page-node-id="F7sFOIFCBshl38Bfpmp8io">
+                    属性的单个追加在标注页底部「＋ 新建属性…」完成（自动写回档案）。
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2026-09-11：内联文本输入弹窗 —— 取代原生 prompt。
+         Electron 实测 window.prompt 抛 "prompt() is not supported."，
+         会让「＋ 新建属性…」与「登记版式变体」在桌面版变成静默死路。 -->
+    <div class="modal-overlay" id="ask-modal">
+        <div class="modal" style="width: 420px;">
+            <div class="modal-head">
+                <span id="ask-title">输入</span>
+                <span class="spacer"></span>
+                <button class="btn-mini" onclick="askCancel()">关闭</button>
+            </div>
+            <div class="modal-body">
+                <div class="ask-msg" id="ask-msg"></div>
+                <div class="form-row">
+                    <input id="ask-input" type="text" autocomplete="off">
+                </div>
+                <div class="ask-actions">
+                    <button class="btn-mini btn-primary" id="ask-ok">确定</button>
+                    <button class="btn-mini" onclick="askCancel()">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        {% include "_api_token.html" %}
+
+        // ========== 状态 ==========
+        const imageName = {{ image_name | tojson }};
+        const img = document.getElementById('src-img');
+        const wrap = document.getElementById('img-wrap');
+        const svg = document.getElementById('overlay');
+        const textInput = document.getElementById('text');
+        const statusEl = document.getElementById('input-status');
+        const inputBar = document.getElementById('input-bar');
+        const btnSave = document.getElementById('btn-save');
+        const btnDel = document.getElementById('btn-del');
+        const btnCancel = document.getElementById('btn-cancel');
+        const zoomInfo = document.getElementById('zoom-info');
+
+        let naturalW = 0, naturalH = 0;
+        let displayW = 0, displayH = 0;
+        let annots = [];        // 已保存的标注（array of {image_name, box, text, ts, source}）
+        let ocrRecords = [];    // OCR 引擎识别的记录（xlsx 里的 box）—— 参考底图
+        let draft = null;       // 当前正在画的框（未保存）
+        let pendingBox = null;  // 等待输入文字的框（画完了，文字还没存）
+        let selectedId = null;  // 选中的标注 id（annots 中的索引）
+        let ocrSelectedId = null;  // 选中的 OCR 记录 id（ocrRecords 中的索引）
+        // P1d-ui：画框/浏览手动模式已删——自动模式（拖拽即画框、单击框即选中、点空白取消选中）
+        let didDrag = false;    // 本次 mousedown 是否演化成拖拽画框（抑制其后的 click 选中）
+        let showOcr = true;     // 是否显示 OCR 参考框
+        let undoStack = [];     // 撤销栈（存被删除的 annot）
+
+        // ========== P1a（2026-09-04）：档案与属性（方案 §4.7） ==========
+        const attrSelect = document.getElementById('attr');
+        const xpageSelect = document.getElementById('xpage');   // P1d-x：跨页续接标记（prev=承上页 / next=接下页）
+        const profileSelect = document.getElementById('profile-select');
+        const ATTR_COLORS = ['#4A7FCB', '#7D9B6A', '#C9A227', '#8E6BB8',
+                             '#3FA8A0', '#D07B3E', '#B85C4A', '#5B6B8C'];
+        const ATTR_NEW = '__new__';   // 「＋ 新建属性…」哨兵值
+        const ATTR_BIND = '__bind__';  // 「先绑定/新建档案…」哨兵值（未绑定档案时的入口）
+        let profiles = [];            // /api/profiles 全量（含 attrs）
+        let boundProfileId = localStorage.getItem('annotate.profileId') || '';
+        let recentAttrs = [];         // 最近使用的属性（Alt+N 快选，最新在前）
+
+        // ========== P1d（2026-09-04）：跨列续框（方案 §4.7 增补） ==========
+        // 竖排分栏截断：一个属性值分布在多个矩形区域（列底俩字+下列顶仨字），
+        // 单框追不全 → 同一条属性标注拆多行存储（共享 gid，行序=拼接顺序）。
+        // P1d-post（用户二次反馈重构）：**事后归组**取代 in-flight 续框——
+        // 全部标完后点"续框"进入归组模式，依次点击若干标注框（点击顺序=拼接
+        // 顺序），属性取首框（首框无属性则取组内第一个有属性的），Enter 完成。
+        const btnCont = document.getElementById('btn-cont');
+        let picking = null;   // 归组选择模式：数组（点击顺序的标注下标）或 null
+
+        function newGid() {   // 与 annotation_groups.GID_RE 同白名单
+            return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        }
+        // 组信息表：gid -> {firstIdx, idxs}（渲染标签 / 组操作共用）
+        function groupMap() {
+            const m = new Map();
+            annots.forEach((a, i) => {
+                if (!a.gid) return;
+                if (!m.has(a.gid)) m.set(a.gid, {firstIdx: i, idxs: []});
+                m.get(a.gid).idxs.push(i);
+            });
+            return m;
+        }
+        // 属性标注条数（组计 1）——头部计数与 annotation_groups.attr_annotation_count 同口径
+        function countAttrAnnotations() {
+            const seen = new Set();
+            let n = 0;
+            annots.forEach(a => {
+                if (!a.attr) return;
+                if (a.gid) { if (!seen.has(a.gid)) { seen.add(a.gid); n++; } }
+                else n++;
+            });
+            return n;
+        }
+        // ===== 归组模式（P1d-post）：进入 / 取消 / 完成 =====
+        function refreshContBtn() {
+            // 归组按钮状态唯一出口（renderAll 统一调用）；P1d-ui 起位于顶栏（收尾阶段语义）
+            btnCont.disabled = picking === null ? annots.length < 2 : false;
+            btnCont.textContent = picking !== null ? '完成归组 (N)' : '续框 (N)';
+            btnCont.classList.toggle('btn-danger', picking !== null);
+        }
+        function startPicking() {
+            if (picking !== null) return;
+            if (annots.length < 2) { toast('至少两个标注框才能归组', 'err'); return; }
+            if (pendingBox) cancelPending();
+            if (ocrSelectedId !== null) selectOcrByIndex(null);
+            selectedId = null;   // 退出编辑态
+            clearInputBar();
+            picking = [];
+            statusEl.className = 'status pending';
+            statusEl.innerHTML = '<b>归组中</b> · 依次点击要归为一条的标注框（点击顺序=拼接顺序）· 属性取首框 · N/Enter 完成归组 · Esc 取消';
+            renderAll();
+        }
+        function togglePick(i) {
+            const pos = picking.indexOf(i);
+            if (pos >= 0) picking.splice(pos, 1);
+            else picking.push(i);
+            const first = picking.length ? annots[picking[0]] : null;
+            statusEl.innerHTML = `<b>归组中</b> · 已选 ${picking.length} 框` +
+                (first ? ` · 首框「${first.text}」· 属性将取 ${first.attr ? `「${first.attr}」` : '组内首个非空（首框当前无属性）'}` : '') +
+                ' · N/Enter 完成归组 · Esc 取消';
+            renderAll();
+        }
+        function cancelPicking() {
+            if (picking === null) return;
+            picking = null;
+            statusEl.className = 'status';
+            statusEl.textContent = '已取消归组。开始画框，或在列表中选一条。';
+            renderAll();
+        }
+        async function commitPicking() {
+            if (picking === null) return;
+            if (picking.length < 2) {
+                toast(`归组至少需要 2 个框（已选 ${picking.length}）`, 'err');
+                return;
+            }
+            // 属性：首框属性；首框无属性则取组内第一个非空（均无 → 组无属性，事后改组首即传播）
+            let attr = annots[picking[0]].attr || '';
+            let profile = annots[picking[0]].profile || '';
+            if (!attr) {
+                for (const k of picking) {
+                    if (annots[k].attr) { attr = annots[k].attr; profile = annots[k].profile || ''; break; }
+                }
+            }
+            // P1d-x：跨页标记取组内首个非空（承上/接下是整条属性的性质，组内一致）
+            let xp = annots[picking[0]].xp || '';
+            if (!xp) {
+                for (const k of picking) {
+                    if (annots[k].xp) { xp = annots[k].xp; break; }
+                }
+            }
+            const gid = newGid();   // 一律新 gid：重选旧组即整体改组（修复断组的方式）
+            picking.forEach(k => {
+                annots[k].gid = gid;
+                if (attr) { annots[k].attr = attr; annots[k].profile = profile; }
+                else delete annots[k].attr;
+                if (xp) annots[k].xp = xp; else delete annots[k].xp;
+            });
+            const n = picking.length;
+            picking = null;
+            await rewriteAll();
+            renderAll();
+            statusEl.className = 'status';
+            statusEl.innerHTML = `已归组：${n} 框为一条${attr ? `（属性「${attr}」）` : '（无属性，点组首改属性即传播整组）'}${xp ? ` · ${xp === 'prev' ? '承上页' : '接下页'}` : ''} · 组框短划线显示`;
+            toast(`✓ 已归组 ${n} 框`, 'ok');
+        }
+
+        function boundProfile() {
+            return profiles.find(p => p.profile_id === boundProfileId) || null;
+        }
+        // 属性 → 着色（按当前绑定档案属性表顺序取色；不在表内 → null 走默认色）
+        function attrColor(attr) {
+            const p = boundProfile();
+            if (!p || !attr) return null;
+            const i = p.attrs.findIndex(a => a.name === attr);
+            return i >= 0 ? ATTR_COLORS[i % ATTR_COLORS.length] : null;
+        }
+
+        // #RRGGBB → rgba(r,g,b,a)
+        function hexToRgba(hex, alpha) {
+            const m = /^#([0-9a-f]{6})$/i.exec(hex);
+            if (!m) return hex;
+            const n = parseInt(m[1], 16);
+            return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+        }
+
+        async function loadProfiles() {
+            try {
+                const r = await fetch('/api/profiles');
+                const d = await r.json();
+                if (d.success) {
+                    profiles = d.profiles || [];
+                    refreshProfileSelect();
+                }
+            } catch (e) {
+                console.error('档案加载失败:', e);
+            }
+        }
+
+        function refreshProfileSelect() {
+            // 单人研究者的常态是"全库只有一个档案"（如「某类文献档案」）。
+            // 这种情况不再要求先手动绑一次 —— 自动绑定并在顶栏显示，随时可在档案管理改。
+            // ≥2 个档案仍要求显式选择（避免替人做决定）。
+            if (!boundProfileId && profiles.length === 1) {
+                boundProfileId = profiles[0].profile_id;
+                localStorage.setItem('annotate.profileId', boundProfileId);
+            }
+            profileSelect.innerHTML = '<option value="">未绑定档案</option>' +
+                profiles.map(p =>
+                    `<option value="${p.profile_id}">${p.name}（${p.attrs.length} 属性）</option>`).join('');
+            if (boundProfileId && profiles.some(p => p.profile_id === boundProfileId)) {
+                profileSelect.value = boundProfileId;
+            } else {
+                boundProfileId = '';   // 档案已删/不存在 → 回到未绑定
+                localStorage.removeItem('annotate.profileId');
+                profileSelect.value = '';
+            }
+            refreshAttrOptions();
+        }
+
+        function onProfileChange(v) {
+            boundProfileId = v;
+            if (v) localStorage.setItem('annotate.profileId', v);
+            else localStorage.removeItem('annotate.profileId');
+            refreshAttrOptions();
+            renderAll();
+        }
+
+        // 属性下拉**绝不做静默死控件**（2026-09-11 修复）
+        // 修前：未绑定档案时直接 `attrSelect.disabled = true` —— 点击毫无反应、
+        // 也没有任何解释，用户看到的正是"属性下拉卡死，没法给标注指定属性"。
+        // 现在改成"说清为什么 + 一键修复"：下拉本身就是入口，选中即打开档案管理。
+        function refreshAttrOptions() {
+            const p = boundProfile();
+            if (!p) {
+                const none = profiles.length === 0;
+                attrSelect.innerHTML =
+                    `<option value="${ATTR_BIND}">`
+                    + (none ? '＋ 先建属性档案…' : '＋ 先绑定属性档案…')
+                    + '</option>';
+                attrSelect.disabled = false;
+                attrSelect.title = none
+                    ? '还没有属性档案 —— 点这里新建（属性 = 你要标注的栏目）'
+                    : '尚未绑定属性档案 —— 点这里选择；绑定后即可为标注指定属性';
+                return;
+            }
+            attrSelect.disabled = false;
+            attrSelect.title = `属性（取自档案「${p.name}」；Alt+1..9 快选最近用过）`;
+            attrSelect.innerHTML = '<option value="">不标属性</option>' +
+                p.attrs.map(a => `<option value="${a.name}">${a.name}</option>`).join('') +
+                `<option value="${ATTR_NEW}">＋ 新建属性…</option>`;
+        }
+
+        async function onAttrChange(v) {
+            if (v === ATTR_BIND) {          // 未绑定档案：下拉即入口，不再静默
+                attrSelect.value = '';
+                await openProfileModal();
+                return;
+            }
+            if (v !== ATTR_NEW) return;
+            // 新建属性：低频动作。**不用原生 prompt** —— Electron 实测抛
+            // "prompt() is not supported."，会让这个选项变成静默死路。
+            const name = (await askText({
+                title: '新建属性',
+                message: '属性名（自动写回当前档案属性集，之后的新标注即刻可选）',
+                placeholder: '如：注册资本',
+                okText: '创建并选用',
+            }) || '').trim();
+            if (!name) { attrSelect.value = ''; return; }
+            try {
+                const r = await fetch(`/api/profiles/${encodeURIComponent(boundProfileId)}/add_attr`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name}),
+                });
+                const d = await r.json();
+                if (d.success) {
+                    profiles = profiles.map(p => p.profile_id === boundProfileId ? d.profile : p);
+                    refreshProfileSelect();
+                    attrSelect.value = name;
+                    toast('✓ 属性已写回档案：' + name, 'ok');
+                } else {
+                    toast('新建失败：' + d.error, 'err');
+                    attrSelect.value = '';
+                }
+            } catch (e) {
+                toast('网络错误：' + e, 'err');
+                attrSelect.value = '';
+            }
+        }
+
+        function markRecentAttr(attr) {
+            if (!attr) return;
+            recentAttrs = [attr, ...recentAttrs.filter(a => a !== attr)].slice(0, 9);
+        }
+
+        // Alt+1..9：快选最近用过的属性（标注流不离开键盘）
+        document.addEventListener('keydown', e => {
+            if (e.altKey && !e.ctrlKey && e.key >= '1' && e.key <= '9') {
+                const idx = parseInt(e.key, 10) - 1;
+                if (!attrSelect.disabled && recentAttrs[idx]) {
+                    e.preventDefault();
+                    attrSelect.value = recentAttrs[idx];
+                }
+            }
+        });
+
+        // ========== 修复 1：同步 viewBox（响应浏览器缩放） ==========
+        function syncViewBox() {
+            const r = img.getBoundingClientRect();
+            displayW = r.width;
+            displayH = r.height;
+            svg.setAttribute('viewBox', `0 0 ${displayW} ${displayH}`);
+            // 浏览器缩放比例（100% = 1.0）
+            const zoom = displayW / naturalW * 100;
+            zoomInfo.textContent = zoom.toFixed(0) + '%';
+            renderAll();
+        }
+
+        // 监听：图片加载完成、窗口 resize、浏览器缩放（resize 在缩放时也触发）
+        img.addEventListener('load', () => {
+            naturalW = img.naturalWidth;
+            naturalH = img.naturalHeight;
+            syncViewBox();
+            loadExisting();
+            loadOcrRecords();
+            loadDrafts();        // P4：草稿层与裁决面板
+            loadNotes();         // 页级备注（给 AI 的提醒通道）
+        });
+        window.addEventListener('resize', syncViewBox);
+        // 浏览器 Ctrl+/Ctrl- 缩放不触发 resize（浏览器自身处理），但用户拖窗口会触发
+
+        // ========== P1d-ui 自动模式（2026-09-06）：拖拽=画框，单击框=选中，点空白=取消选中 ==========
+        // 旧 setMode(画框/浏览按钮) 已删——用户实测手动切换繁琐；阈值 6px 区分"点击"与"拖拽"
+
+        // ========== 坐标换算 ==========
+        function displayToNatural(dx, dy) {
+            return [
+                Math.max(0, Math.min(naturalW, Math.round(dx * naturalW / displayW))),
+                Math.max(0, Math.min(naturalH, Math.round(dy * naturalH / displayH))),
+            ];
+        }
+        function naturalToDisplay(nx, ny) {
+            return [nx * displayW / naturalW, ny * displayH / naturalH];
+        }
+        function svgPoint(evt) {
+            const rect = svg.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top,
+            };
+        }
+
+        // ========== 拖拽画框（自动模式：mousedown 只记录起点，移动超阈值才成 draft） ==========
+        let drawing = false;
+        let startPt = null;
+
+        svg.addEventListener('mousedown', (e) => {
+            if (picking !== null) return;   // P1d-post：归组模式中禁画框
+            if (e.button !== 0) return;
+            didDrag = false;                // 每次按下重置（click 必伴随 mousedown，复位安全）
+            // 如果有待输入的框，先保存
+            if (pendingBox) {
+                commitPending();
+                return;
+            }
+            drawing = true;
+            startPt = svgPoint(e);
+            draft = null;   // 延迟成框：区分"点击选择"与"拖拽画框"
+            e.preventDefault();
+        });
+
+        svg.addEventListener('mousemove', (e) => {
+            if (!drawing) return;
+            const p = svgPoint(e);
+            if (!draft) {
+                if (!startPt) return;
+                // 未超阈值=仍可能是点击，不成框
+                if (Math.abs(p.x - startPt.x) < 6 && Math.abs(p.y - startPt.y) < 6) return;
+                draft = { x1: startPt.x, y1: startPt.y, x2: p.x, y2: p.y };
+                didDrag = true;
+            }
+            draft.x2 = p.x;
+            draft.y2 = p.y;
+            renderDraft();
+        });
+
+        svg.addEventListener('mouseup', (e) => {
+            if (!drawing) return;
+            drawing = false;
+            startPt = null;
+            if (!draft) return;   // 纯点击（未拖拽）：交给 click 事件处理选中/取消
+            const p = svgPoint(e);
+            draft.x2 = p.x;
+            draft.y2 = p.y;
+            const x1 = Math.min(draft.x1, draft.x2);
+            const y1 = Math.min(draft.y1, draft.y2);
+            const x2 = Math.max(draft.x1, draft.x2);
+            const y2 = Math.max(draft.y1, draft.y2);
+            if ((x2 - x1) < 6 || (y2 - y1) < 6) {
+                draft = null;
+                renderDraft();
+                return;
+            }
+            // 自然像素坐标
+            const [nx1, ny1] = displayToNatural(x1, y1);
+            const [nx2, ny2] = displayToNatural(x2, y2);
+            pendingBox = { x1: nx1, y1: ny1, x2: nx2, y2: ny2 };
+            draft = null;
+            renderDraft();
+            // 弹出底部输入栏（不阻塞滚动！）
+            showPendingInput();
+        });
+
+        svg.addEventListener('mouseleave', () => {
+            if (drawing) {
+                drawing = false;
+                draft = null;
+                startPt = null;
+                renderDraft();
+            }
+        });
+
+        // P1d-ui：点空白处（未命中任何 rect 的 click）= 取消选中（浏览语义）
+        svg.addEventListener('click', (e) => {
+            if (didDrag) { didDrag = false; return; }   // 拖拽画框后的收尾 click，忽略
+            if (pendingBox) return;     // 有待输入框时不抢操作（Esc/取消键负责）
+            if (picking !== null) return;
+            if (selectedId !== null || ocrSelectedId !== null) {
+                selectByIndex(null);
+            }
+        });
+
+        // ========== 修复 2：底部输入栏（替代 prompt，不阻塞滚动） ==========
+        function showPendingInput() {
+            // 进入"待输入"状态：脉冲高亮 + focus 输入框
+            renderAll();
+            textInput.disabled = false;
+            textInput.value = '';
+            textInput.focus();
+            btnSave.disabled = false;
+            btnCancel.disabled = false;
+            btnDel.disabled = true;
+            inputBar.classList.remove('disabled');
+            inputBar.style.borderTopColor = 'var(--success)';
+            statusEl.className = 'status pending';
+            const [x1, y1, x2, y2] = [pendingBox.x1, pendingBox.y1, pendingBox.x2, pendingBox.y2];
+            statusEl.innerHTML = `<b>新框待输入</b> · 位置 (${x1}, ${y1}) - (${x2}, ${y2}) · ${x2 - x1}×${y2 - y1} 像素`;
+        }
+
+        async function commitPending() {
+            if (!pendingBox) return;
+            ocrSelectedId = null;  // 互斥：手动画框时清空 OCR 选中
+            const text = textInput.value.trim();
+            if (!text) {
+                cancelPending();
+                toast('文字为空，已取消', 'err');
+                return;
+            }
+            const box = [pendingBox.x1, pendingBox.y1, pendingBox.x2, pendingBox.y2];
+            const attr = (!attrSelect.disabled && attrSelect.value) ? attrSelect.value : '';
+            const xp = xpageSelect.value;   // P1d-x：跨页续接标记（非粘滞，保存后复位）
+            pendingBox = null;
+            textInput.value = '';
+            textInput.disabled = true;
+            btnSave.disabled = true;
+            btnCancel.disabled = true;
+            inputBar.classList.add('disabled');
+            inputBar.style.borderTopColor = 'var(--border)';
+            await saveAnnotation(box, text, attr, xp);
+            xpageSelect.value = '';
+            // 属性粘滞：连续画框默认沿用上次属性（attrSelect 值未清空）
+        }
+
+        function cancelPending() {
+            pendingBox = null;
+            textInput.value = '';
+            textInput.disabled = true;
+            btnSave.disabled = true;
+            btnCancel.disabled = true;
+            inputBar.classList.add('disabled');
+            inputBar.style.borderTopColor = 'var(--border)';
+            xpageSelect.value = '';   // P1d-x：非粘滞
+            statusEl.className = 'status';
+            statusEl.textContent = '已取消。开始画框，或在列表中选一条。';
+            renderAll();
+        }
+
+        btnSave.addEventListener('click', commitPending);
+        btnCancel.addEventListener('click', cancelPending);
+        textInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                commitPending();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelPending();
+            }
+        });
+
+        // ========== 保存标注（自动保存草稿；P1a 起可选带属性。归组走事后归组模式） ==========
+        async function saveAnnotation(box, text, attr, xp) {
+            const body = { image_name: imageName, box, text };
+            // P1a：属性三件套（attr / profile / note）——非空才发
+            if (attr) body.attr = attr;
+            if (boundProfileId) body.profile = boundProfileId;
+            if (xp) body.xp = xp;   // P1d-x：跨页续接标记，非空才发
+            try {
+                const r = await fetch('/api/manual_annotate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body),
+                });
+                const d = await r.json();
+                if (d.success) {
+                    annots.push(d.saved);
+                    if (attr) markRecentAttr(attr);
+                    renderAll();
+                    selectByIndex(annots.length - 1);
+                    toast('✓ 已保存（自动入 jsonl' + (attr ? ` · ${attr}` : '') + (xp ? ` · ${xp === 'prev' ? '承上页' : '接下页'}` : '') + '）', 'ok');
+                } else {
+                    toast('保存失败：' + d.error, 'err');
+                }
+            } catch (e) {
+                toast('网络错误：' + e, 'err');
+            }
+        }
+
+        // ========== P4（2026-09-10）：草稿层与裁决（半自动标注通用方案 §5 P4）==========
+        // 草稿 = P3 预标注产物（data/preannotations/<stem>.ai.jsonl），**只读**；
+        // 裁决走 /api/preannotations/*，采纳落 manual_annotations/（source=ai_verified）。
+        // 三视图 = ①画布草稿框层 ②本列表 ③局部放大（CSS 背景裁切，零后端裁图）。
+        // 无草稿的页面整组控件隐藏 → 对既有画框工作流零影响。
+        const DP_OPEN_KEY = 'annotate.draftPanel';
+        let aiDrafts = [];        // 草稿条目（含 status/edited 裁决状态）
+        let aiStats = {};         // {total, accepted, rejected, pending, by_confidence}
+        let aiEstimate = {};      // P4 验收口径：{manual_ops, draft_ops_batch, drop_batch, ...}
+        let aiBatchSafe = false;  // 批量采纳安全门（后端判定，前端只显示）
+        let aiBatchReason = '';
+        let aiBlocked = null;     // 门禁类型：drift_suspended / untrusted_geometry / null
+        // L0（规则切分）页级自检旁证：{confidence, fill_rate, n_records, orphan_chars,
+        // orphan_head, orphan_tail, records_fallback, reason}。**只读提示**，不参与判定。
+        let aiL0 = null;
+        let aiFocus = null;       // 聚焦条目的 idx
+        // M5：分段视图（"折叠 + 展开可见各段"）。折叠 = **显示粒度**变小，
+        // 绝不隐藏内容：值始终在 text 里、各段展开即可见，画布同步画出每一段框。
+        let aiOpen = new Set();   // 已展开分段视图的条目 idx
+        let aiSegPick = null;     // 展开中被点选的段 {idx, seg} → 画布加粗
+        let showAi = true;        // 草稿框层是否可见
+
+        const aiPanel = document.getElementById('draft-panel');
+        const aiList = document.getElementById('dp-list');
+        const aiLoupe = document.getElementById('dp-loupe');
+
+        function aiEsc(s) {
+            return String(s ?? '').replace(/[&<>"']/g,
+                c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        function toggleAiVisibility(v) { showAi = v; renderAi(); }
+
+        function toggleDraftPanel(force) {
+            const open = (force === undefined)
+                ? !aiPanel.classList.contains('open') : !!force;
+            aiPanel.classList.toggle('open', open);
+            document.body.classList.toggle('draft-open', open);
+            try { localStorage.setItem(DP_OPEN_KEY, open ? '1' : '0'); } catch (e) {}
+            if (open) aiLoupeFor(aiFocus);
+            renderAi();      // M5：面板开合决定画布是否画分段框（关则收回）
+        }
+
+        async function loadDrafts() {
+            try {
+                const r = await fetch(`/api/preannotations/${encodeURIComponent(imageName)}`);
+                const d = await r.json();
+                if (!d.success) return;
+                aiDrafts = d.entries || [];
+                aiStats = d.stats || {};
+                aiEstimate = d.estimate || {};
+                aiBatchSafe = d.batch_safe === true;
+                aiBatchReason = d.batch_block_reason || '';
+                aiBlocked = d.blocked || null;
+                aiL0 = d.l0 || null;
+                const has = aiDrafts.length > 0;
+                document.getElementById('show-ai-wrap').style.display = has ? '' : 'none';
+                const btn = document.getElementById('btn-ai');
+                btn.style.display = has ? '' : 'none';
+                const pend = aiStats.pending || 0;
+                document.getElementById('btn-ai-n').textContent = pend;
+                btn.classList.toggle('on', pend > 0);
+                document.getElementById('ai-count').textContent = `(${aiDrafts.length})`;
+                if (has && aiFocus === null) aiFocus = aiDrafts[0].idx;
+                renderAll();
+                // ⚠ 2026-09-11 补：`renderDraftList()`（视图②=裁决列表）原先**只在**
+                // 点选草稿框 / 键盘挪条 / 展开分段时才被调用 —— 于是"面板自动打开"
+                // 这条路径下面板是空的（要用户先点一下才出列表）。列表填充属于
+                // 加载的一部分，在此显式调用一次（幂等，重复调用无害）。
+                renderDraftList();
+                // 首次进入且有草稿 → 自动开面板（用户关过就记住，不再打扰）
+                let remembered = null;
+                try { remembered = localStorage.getItem(DP_OPEN_KEY); } catch (e) {}
+                if (has && remembered !== '0') toggleDraftPanel(true);
+            } catch (e) { console.error('加载草稿失败:', e); }
+        }
+
+        // ---- 视图①：画布上的草稿框层（在 OCR 之上、已保存之下）----
+        function renderAi() {
+            svg.querySelectorAll('.ai-rect, .ai-label, .ai-seg-rect, .ai-seg-label')
+                .forEach(el => el.remove());
+            if (!showAi || !naturalW || !aiDrafts.length) return;
+            aiDrafts.forEach(e => {
+                const box = e.box;
+                if (!box || box.length !== 4) return;
+                const [dx1, dy1] = naturalToDisplay(box[0], box[1]);
+                const [dx2, dy2] = naturalToDisplay(box[2], box[3]);
+                const st = e.status || 'pending';
+                const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                r.setAttribute('class', 'ai-rect' + (st !== 'pending' ? ' ' + st : '')
+                    + (e.idx === aiFocus ? ' focused' : ''));
+                r.setAttribute('x', dx1);
+                r.setAttribute('y', dy1);
+                r.setAttribute('width', Math.max(1, dx2 - dx1));
+                r.setAttribute('height', Math.max(1, dy2 - dy1));
+                r.addEventListener('click', ev => {
+                    ev.stopPropagation();
+                    if (didDrag) { didDrag = false; return; }
+                    aiFocusIdx(e.idx);
+                });
+                svg.appendChild(r);
+                const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                t.setAttribute('class', 'ai-label' + (st !== 'pending' ? ' ' + st : ''));
+                t.setAttribute('x', dx1 + 2);
+                t.setAttribute('y', dy1 - 4 > 12 ? dy1 - 4 : dy1 + 14);
+                t.textContent = 'ai' + (e.idx + 1);
+                svg.appendChild(t);
+            });
+            renderAiSegments();
+        }
+
+        // ---- M5：分段视图的**画布侧** ----
+        // 展开的条目在图上画出**每一段**的框（绝不合并成并集），并给段编号；
+        // 被点选的段加粗。折叠即收回（仍可从面板展开，内容不丢）。
+        function renderAiSegments() {
+            if (!aiPanel.classList.contains('open')) return;
+            aiDrafts.forEach(e => {
+                if (!aiOpen.has(e.idx)) return;
+                (e.segments || []).forEach(s => {
+                    const b = s.box;
+                    if (!b || b.length !== 4) return;
+                    const [sx1, sy1] = naturalToDisplay(b[0], b[1]);
+                    const [sx2, sy2] = naturalToDisplay(b[2], b[3]);
+                    const picked = !!aiSegPick
+                        && aiSegPick.idx === e.idx && aiSegPick.seg === s.seg;
+                    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    r.setAttribute('class', 'ai-seg-rect' + (picked ? ' picked' : ''));
+                    r.setAttribute('x', sx1);
+                    r.setAttribute('y', sy1);
+                    r.setAttribute('width', Math.max(1, sx2 - sx1));
+                    r.setAttribute('height', Math.max(1, sy2 - sy1));
+                    svg.appendChild(r);
+                    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    t.setAttribute('class', 'ai-seg-label');
+                    t.setAttribute('x', sx1 + 2);
+                    t.setAttribute('y', sy2 + 11);
+                    t.textContent = String(s.seg + 1);
+                    svg.appendChild(t);
+                });
+            });
+        }
+
+        // 折叠开关：只改显示粒度（展开 → 逐段；折叠 → 一条），不增删任何数据
+        function aiToggleSegs(idx) {
+            if (aiOpen.has(idx)) aiOpen.delete(idx); else aiOpen.add(idx);
+            if (aiSegPick && aiSegPick.idx === idx) aiSegPick = null;
+            renderDraftList();
+            renderAi();
+        }
+
+        // 点选某段 → 画布上该段框加粗（再点一次取消）
+        function aiPickSeg(idx, seg) {
+            const same = !!aiSegPick && aiSegPick.idx === idx && aiSegPick.seg === seg;
+            aiSegPick = same ? null : {idx: idx, seg: seg};
+            aiOpen.add(idx);
+            renderDraftList();
+            renderAi();
+        }
+
+        // ---- 红线二（三视图）：VLM 值 / OCR 原文并排 + 差异字标出（防盲签）----
+        // 三视图之一/之二 = 框内裁片（dp-loupe）+ 本对照行；第三个视图是画布草稿框层。
+        // 对照口径：在 OCR 原文中找与 VLM 值最相似的**等长窗口**（字符级匹配数最大），
+        // 命中片段高亮为「锚点」，VLM 值中与锚点不同的字标红 —— 人工一眼看到差在哪。
+        function aiCompare(vlm, ocr) {
+            const v = String(vlm ?? ''), o = String(ocr ?? '');
+            if (!o) {
+                return {vlm: aiEsc(v) || '（空值）',
+                        ocr: '<span class="dp-rest">（未定位到 OCR 行）</span>'};
+            }
+            const n = v.length;
+            let best = 0, bestScore = -1;
+            for (let i = 0; n && i + n <= o.length; i++) {
+                let s = 0;
+                for (let j = 0; j < n; j++) if (o[i + j] === v[j]) s++;
+                if (s > bestScore) { bestScore = s; best = i; }
+            }
+            const hit = n > 0 && bestScore >= Math.max(1, Math.ceil(n * 0.5));
+            const seg = hit ? o.slice(best, best + n) : '';
+            let vHtml = '';
+            for (let j = 0; j < n; j++) {
+                const ch = aiEsc(v[j]);
+                vHtml += (hit && seg[j] !== v[j]) ? `<em class="dp-diff">${ch}</em>` : ch;
+            }
+            const oHtml = hit
+                ? aiEsc(o.slice(0, best))
+                  + `<span class="dp-hit">${aiEsc(seg)}</span>`
+                  + aiEsc(o.slice(best + n))
+                : aiEsc(o);
+            return {vlm: vHtml || '（空值）', ocr: oHtml};
+        }
+
+        // ---- M5：分段视图的 HTML 生成（**纯函数**：只在 entry/open/pick 上计算，
+        // 便于 _probe/check_annotate_js.js 离线断言"每段都可见 / 守恒提示正确"）
+        // 折叠 = 显示粒度变小，**绝不隐藏**：展开块逐段给出文本、几何、段标识、
+        // 该段 OCR 行原文，并显示"逐段合计 vs 值字数"的守恒自检。
+        function aiSegTag(e, open) {
+            const segs = e.segments || [];
+            const n = segs.length || ((e.evidence || {}).n_segments || 1);
+            if (segs.length < 2) return `${n} 段`;
+            return `<button class="dp-fold${open ? ' on' : ''}" data-fold="${e.idx}"`
+                + ` title="展开逐段核对（折叠只改显示粒度，不隐藏任何段）">`
+                + `${open ? '▾' : '▸'} ${n} 段</button>`;
+        }
+
+        function aiSegBlock(e, pick) {
+            const segs = e.segments || [];
+            if (segs.length < 2) return '';
+            const rows = segs.map(s => {
+                const bb = s.box || [];
+                const geo = bb.length === 4
+                    ? `x${Math.round(bb[0])}–${Math.round(bb[2])}`
+                      + ` · y${Math.round(bb[1])}–${Math.round(bb[3])}`
+                    : '无框';
+                const picked = !!pick && pick.idx === e.idx && pick.seg === s.seg;
+                const uid = s.row_uid ? ` · ${aiEsc(String(s.row_uid).slice(0, 16))}` : '';
+                return `<div class="dp-seg${picked ? ' picked' : ''}" data-seg="${s.seg}"`
+                    + ` title="点选 → 画布高亮该段框">`
+                    + `<span class="dp-seg-n">段${s.seg + 1}</span>`
+                    + `<span class="dp-seg-t">${aiEsc(s.text) || '<span class="dp-rest">（空）</span>'}</span>`
+                    + `<span class="dp-seg-m">${aiEsc(geo)} · ${s.n_chars || 0} 字${uid}</span>`
+                    + (s.ocr_line ? `<span class="dp-seg-o">OCR ${aiEsc(s.ocr_line)}</span>` : '')
+                    + '</div>';
+            }).join('');
+            const sumN = segs.reduce((a, x) => a + (x.n_chars || 0), 0);
+            const valN = String(e.text || '').trim().length;
+            const okN = sumN === valN;
+            return '<div class="dp-segs">' + rows
+                + `<div class="dp-seg-sum ${okN ? 'ok' : 'bad'}">`
+                + `逐段合计 ${sumN} 字 / 值 ${valN} 字 `
+                + (okN ? '✓ 守恒' : '⚠ 不等（勿采纳，请修正）')
+                + '</div></div>';
+        }
+
+        // ---- 视图②：裁决列表 ----
+        function renderDraftList() {
+            const bc = aiStats.by_confidence || {};
+            document.getElementById('dp-stats').innerHTML =
+                `<div class="dp-stat"><b>${aiStats.pending || 0}</b><span>待裁</span></div>` +
+                `<div class="dp-stat"><b>${aiStats.accepted || 0}</b><span>已采纳</span></div>` +
+                `<div class="dp-stat"><b>${aiStats.rejected || 0}</b><span>已忽略</span></div>` +
+                `<div class="dp-stat"><b>${bc.high || 0}</b><span>高置信</span></div>`;
+            // P4 验收口径实时显示（唯一来源 = 后端 estimate_ops，前端不重算）
+            const est = aiEstimate || {};
+            const opsEl = document.getElementById('dp-ops');
+            if (est.manual_ops) {
+                if (aiBatchSafe) {
+                    const pct = Math.round((est.drop_batch || 0) * 1000) / 10;
+                    const cls = (est.drop_batch || 0) >= 0.8 ? 'ok' : 'no';
+                    opsEl.innerHTML = `全手工 <b>${est.manual_ops}</b> 次 → 一键采纳 <b>${est.draft_ops_batch}</b> 次`
+                        + ` · 降 <span class="${cls}">${pct}%</span> <span>（验收 ≥ 80%）</span>`;
+                } else {
+                    const pct = Math.round((est.drop_each || 0) * 1000) / 10;
+                    opsEl.innerHTML = `全手工 <b>${est.manual_ops}</b> 次 → 逐条裁决 <b>${est.draft_ops_each}</b> 次`
+                        + ` · 降 <span class="no">${pct}%</span> <span>（批量口径不适用，原因见下）</span>`;
+                }
+            } else {
+                opsEl.textContent = '';
+            }
+            // ---- L0 页级自检（低置信 / 未覆盖字符**必须可见**，绝不静默）----
+            // 口径来源 = preannotate_gen 落盘的 `<stem>.l0.json`（只读旁证）；
+            // 没有这条旁证（旧草稿 / 线上模型切分）就整条隐藏，不臆造。
+            const l0El = document.getElementById('dp-l0');
+            if (aiL0) {
+                const confCn = { high: '高', medium: '中', low: '低' }[aiL0.confidence]
+                    || aiL0.confidence || '?';
+                const orphan = aiL0.orphan_chars || 0;
+                const bits = [`记录 ${aiL0.n_records ?? '?'} 条`,
+                              `填充率 ${aiL0.fill_rate ?? '?'}`];
+                let warn = false;
+                if (!aiL0.parse_ok) {
+                    warn = true;
+                    bits.push(`未切出记录（${aiL0.reason || '原因未记'}）`);
+                }
+                if (aiL0.records_fallback) {
+                    warn = true;
+                    bits.push(`整页一条兜底（${aiL0.records_fallback}）`);
+                } else if (aiL0.confidence === 'low') {
+                    warn = true; bits.push('整页把握低，建议逐条复核');
+                } else if (aiL0.confidence === 'medium') {
+                    warn = true; bits.push('中等把握，抽查为宜');
+                }
+                if (orphan > 0) {
+                    warn = true;
+                    const sample = ((aiL0.orphan_head || '') + (aiL0.orphan_tail || ''))
+                        .slice(0, 24);
+                    bits.push(`${orphan} 字未被任何记录覆盖`
+                        + (sample ? `（如「${sample}」）` : ''));
+                }
+                // ---- L1 指针补全口径（可选档；同一旁证文件里带回，无则不显示）----
+                const l1 = aiL0.l1 || null;
+                if (l1 && (l1.mode || l1.reason)) {
+                    const f = l1.n_filled || 0, rj = l1.n_rejected || 0;
+                    if (l1.reason === 'no_gap') {
+                        bits.push('指针补全：规则已填满，零调用跳过');
+                    } else if (l1.reason && String(l1.reason).startsWith('l1_error')) {
+                        warn = true;
+                        bits.push('指针补全调用失败，已回落规则结果');
+                    } else if (l1.mode) {
+                        const money = aiL0.l1_cost_cny != null
+                            ? `　¥${Number(aiL0.l1_cost_cny).toFixed(4)}` : '';
+                        bits.push(`指针补全(L1) 补 ${f} 项 / 拒 ${rj} 项${money}`);
+                        if (rj > f) {
+                            warn = true;
+                            bits.push('拒多于补属正常：取不到确定锚词时宁可不填');
+                        }
+                    }
+                }
+                const spName = aiL0.splitter || '';
+                const head = spName === 'rule_l1' ? '指针补全(L1，规则未切出)'
+                    : (spName === 'rule_l0+l1' ? '规则切分(L0) + 指针补全(L1)'
+                    : '规则切分(L0)');
+                l0El.className = 'dp-l0 on' + (warn ? ' warn' : '');
+                l0El.innerHTML = `<b>${head} 置信 ${confCn}</b> · `
+                    + bits.map(aiEsc).join(' · ');
+            } else {
+                l0El.className = 'dp-l0';
+                l0El.textContent = '';
+            }
+            document.getElementById('dp-count').textContent =
+                `${(aiStats.accepted || 0) + (aiStats.rejected || 0)} / ${aiStats.total || 0}`;
+            const pendHigh = aiDrafts.filter(e =>
+                e.status === 'pending' && e.confidence === 'high').length;
+            document.getElementById('dp-batch-n').textContent = pendHigh;
+            // 安全门：不可信几何来源上禁用批量采纳，并**说明原因**（后端也会独立拒绝）
+            document.getElementById('dp-batch').disabled = pendHigh === 0 || !aiBatchSafe;
+            const gateEl = document.getElementById('dp-gate');
+            if (aiBatchSafe) {
+                gateEl.className = 'dp-gate';
+                gateEl.textContent = '';
+            } else {
+                gateEl.className = 'dp-gate on';
+                gateEl.innerHTML = `<b>批量采纳已停用</b>：${aiEsc(aiBatchReason || '本页几何来源不可信')}`
+                    + (aiBlocked === 'drift_suspended'
+                        ? `<button class="dp-var-btn" onclick="aiRegisterVariant()" `
+                          + `title="仅当人工确认『这确实是一种合法的另一种版式』时才登记；登记后同类页不再报警">`
+                          + `登记为本档案的版式变体</button>`
+                        : '');
+            }
+            if (!aiDrafts.length) {
+                aiList.innerHTML = '<div class="dp-hint">本页无草稿。'
+                    + '到 dashboard「专项栏目」里点该栏目的「半自动标注」，'
+                    + '系统会用金标准例题学到的规则自动读全样本并生成草稿。'
+                    + '<br>若点过之后本页仍无草稿（系统拆分失败，完成弹窗会点名这几页），'
+                    + '请直接在本页手动标注——人工兜底永远保留。</div>';
+                return;
+            }
+            aiList.innerHTML = aiDrafts.map(e => {
+                const ev = e.evidence || {};
+                const cmp = aiCompare(e.text, ev.ocr_text);
+                const fit = (ev.char_fit_rel_err === null || ev.char_fit_rel_err === undefined)
+                    ? '' : ` · 字长误差 ${Math.round(ev.char_fit_rel_err * 100)}%`;
+                const segs = e.segments || [];
+                const open = segs.length >= 2 && aiOpen.has(e.idx);
+                // 多段 → 「段数」变成可点开关（展开逐段）；单段 → 保持纯文本。
+                const segTag = aiSegTag(e, open);
+                const segBlock = open ? aiSegBlock(e, aiSegPick) : '';
+                // 飞轮：规则层对该条目的判定（SUSPECT 即"系统自己怀疑这里读错"）
+                const rule = ev.rule || null;
+                const ruleTag = rule
+                    ? `<span class="dp-rule${rule.status === 'SUSPECT' ? ' suspect' : ''}"`
+                      + ` title="${aiEsc((rule.rule || '') + '：' + (rule.reason || ''))}">`
+                      + `${rule.status === 'SUSPECT' ? '规则疑错' : '规则已修正'}</span>`
+                    : '';
+                return `
+                <div class="dp-item ${e.status || 'pending'}${e.idx === aiFocus ? ' focused' : ''}" data-idx="${e.idx}">
+                    <div class="dp-row1">
+                        <span class="dp-sq"></span>
+                        <span class="dp-attr${e.attr ? '' : ' noname'} editable" data-idx="${e.idx}"
+                            title="点击改属性（改完本条回到待裁，需重新裁决）"
+                            onclick="event.stopPropagation(); aiReassignAttr(${e.idx}, this.closest('.dp-item'))">${aiEsc(e.attr || '未标属性')}</span>
+                        ${ruleTag}
+                        <span class="dp-conf${e.confidence === 'high' ? ' high' : ''}">${aiEsc(e.confidence || '?')}</span>
+                    </div>
+                    <div class="dp-tri">
+                        <span class="dp-k">VLM</span><span class="dp-vlm">${cmp.vlm}</span>
+                        <span class="dp-k">OCR</span><span class="dp-ocr" title="${aiEsc(ev.ocr_text || '')}">${cmp.ocr}</span>
+                    </div>
+                    <div class="dp-meta">定位 ${aiEsc(ev.locate || '-')} · ${segTag}${fit}${e.edited ? ' · 已修正' : ''}${rule ? ' · ' + aiEsc(rule.reason || '') : ''}</div>
+                    ${segBlock}
+                    <div class="dp-btns">${(e.status === 'pending')
+                        ? '<button class="primary" data-act="accept">通过</button>' +
+                          '<button data-act="amend">修正</button>' +
+                          '<button data-act="reject">忽略</button>'
+                        : '<button data-act="reset">撤回</button>'}
+                        <button data-act="zoom">放大</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function aiFocusIdx(idx, noScroll) {
+            aiFocus = idx;
+            renderAi();
+            renderDraftList();
+            const el = aiList.querySelector(`.dp-item[data-idx="${idx}"]`);
+            if (el && !noScroll) el.scrollIntoView({block: 'nearest'});
+            aiLoupeFor(idx);
+        }
+
+        // ---- 视图③：局部放大（CSS 背景裁切；框中心对齐视图中心）----
+        function aiLoupeFor(idx) {
+            const e = aiDrafts.find(x => x.idx === idx);
+            if (!e || !e.box || e.box.length !== 4 || !naturalW) {
+                aiLoupe.style.backgroundImage = 'none';
+                aiLoupe.textContent = '点选草稿条目 → 此处放大原图对应区域';
+                return;
+            }
+            const [x1, y1, x2, y2] = e.box;
+            const bw = Math.max(1, x2 - x1), bh = Math.max(1, y2 - y1);
+            const lw = aiLoupe.clientWidth || 376, lh = aiLoupe.clientHeight || 168;
+            const scale = Math.max(1, Math.min(6,
+                Math.min((lw * 0.72) / bw, (lh * 0.72) / bh)));
+            aiLoupe.textContent = '';
+            aiLoupe.style.backgroundImage = `url("${img.src}")`;
+            aiLoupe.style.backgroundSize = `${naturalW * scale}px ${naturalH * scale}px`;
+            aiLoupe.style.backgroundPosition =
+                `${(lw - bw * scale) / 2 - x1 * scale}px ` +
+                `${(lh - bh * scale) / 2 - y1 * scale}px`;
+        }
+
+        // ---- 裁决动作 ----
+        async function aiDecide(idx, action, extra) {
+            try {
+                const r = await fetch('/api/preannotations/decide', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(Object.assign(
+                        {image_name: imageName, idx: idx, action: action}, extra || {})),
+                });
+                const d = await r.json();
+                if (!d.ok) { toast(d.error || '裁决失败', 'err'); return false; }
+                await loadDrafts();
+                await loadExisting();        // 采纳/撤回改的是 manual 层 → 同步画布
+                toast(action === 'accept' ? (d.edited ? '✓ 已修正并采纳' : '✓ 已采纳')
+                    : action === 'reject' ? '已忽略（草稿留痕，不写入标注）' : '已撤回', 'ok');
+                return true;
+            } catch (e) { toast('网络错误：' + e, 'err'); return false; }
+        }
+
+        // ========== P5：把本页登记为「版式变体」（漂移逃生门）==========
+        // 红线三要求「漂移可见 + 逃生门」，逃生门**必须由人触发**——
+        // 故此处只有人工填写名称才会提交，任何自动路径都不会调用它。
+        async function aiRegisterVariant() {
+            // 同上：内联弹窗取代原生 prompt（Electron 不支持 prompt）
+            const name = await askText({
+                title: '登记版式变体',
+                message: '把本页登记为本档案的「版式变体」。\n'
+                    + '仅当你确认这确实是一种合法的另一种版式时才登记。',
+                placeholder: '变体名称，如：横排页 / 表格页',
+                okText: '登记',
+            });
+            if (!name) return;
+            try {
+                const r = await fetch('/api/drift/variant', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image_name: imageName, name: name,
+                                          stems: [imageName]}),
+                });
+                const d = await r.json();
+                if (!d.ok) { toast(d.error || '登记失败', 'err'); return; }
+                toast('已登记为版式变体 ' + (d.variant_id || ''), 'ok');
+                await loadDrafts();
+            } catch (e) { toast('网络错误：' + e, 'err'); }
+        }
+
+        // ========== 页级备注（2026-09-26）：给 AI 的提醒通道 ==========
+        // 落 manual_annotations/notes/<image_name>.notes.jsonl，**只追加**；
+        // 用户原先把提醒夹在文本括号里会污染金标准 —— 备注是它的干净通道。
+        async function loadNotes() {
+            const listEl = document.getElementById('dp-notes-list');
+            const nEl = document.getElementById('dp-notes-n');
+            try {
+                const r = await fetch(`/api/notes/${encodeURIComponent(imageName)}`);
+                const d = await r.json();
+                const items = d.success ? (d.notes || []) : [];
+                if (nEl) nEl.textContent = items.length ? `(${items.length}) ` : '';
+                if (!listEl) return;
+                if (!items.length) {
+                    listEl.innerHTML = '<div class="dp-notes-empty">（本页暂无备注）</div>';
+                    return;
+                }
+                listEl.innerHTML = items.map((x, i) =>
+                    `<div class="dp-note">${x.box ? '<span class="nb" title="'
+                        + aiEsc((x.box || []).join(', ')) + '">框</span>' : ''}`
+                    + `<b>${aiEsc(x.note)}</b>`
+                    + `<span style="color:var(--subtle);"> · ${aiEsc(x.ts || '')}</span></div>`
+                ).join('');
+            } catch (e) { console.error('加载备注失败:', e); }
+        }
+
+        async function aiSaveNote() {
+            const inp = document.getElementById('dp-note-input');
+            const val = (inp.value || '').trim();
+            if (!val) { toast('备注内容不能为空', 'err'); return; }
+            // 可选附带当前选中草稿条目的框（帮 AI 定位是哪一条）
+            let box = null;
+            if (document.getElementById('dp-note-with-box').checked && aiFocus !== null) {
+                const e = aiDrafts.find(x => x.idx === aiFocus);
+                if (e && e.box && e.box.length === 4) box = e.box;
+            }
+            try {
+                const r = await fetch(`/api/notes/${encodeURIComponent(imageName)}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(box ? {note: val, box: box} : {note: val}),
+                });
+                const d = await r.json();
+                if (!d.success) { toast(d.error || '存备注失败', 'err'); return; }
+                inp.value = '';
+                toast('✓ 已存备注（不进金标准文本）', 'ok');
+                await loadNotes();
+            } catch (e) { toast('网络错误：' + e, 'err'); }
+        }
+        // 备注输入框里 Enter = 存（别让底栏/面板快捷键抢键）
+        document.getElementById('dp-note-input').addEventListener('keydown', ev => {
+            ev.stopPropagation();
+            if (ev.key === 'Enter') { ev.preventDefault(); aiSaveNote(); }
+        });
+
+        async function aiBatchHigh() {
+            if (!aiBatchSafe) {                       // 双保险：后端也会拒
+                toast(aiBatchReason || '本页批量采纳已停用', 'err');
+                return;
+            }
+            try {
+                const r = await fetch('/api/preannotations/batch_decide', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image_name: imageName, action: 'accept',
+                                          confidences: ['high']}),
+                });
+                const d = await r.json();
+                if (!d.ok) { toast(d.error || '批量采纳失败', 'err'); return; }
+                toast(`✓ 批量采纳 ${d.n} 条高置信草稿`, 'ok');
+                await loadDrafts();
+                await loadExisting();
+            } catch (e) { toast('网络错误：' + e, 'err'); }
+        }
+
+        // 改属性（2026-09-26）：点击属性名 → 内联下拉（契约属性 = 当前绑定档案的属性集）
+        // 后端落两处（data/results/<stem>.result.json + 草稿层）并清旧裁决状态键；
+        // 已采纳条目后端会拒（409）——先「撤回」再改，防止金标准重复行。
+        function aiContractAttrs() {
+            const p = profiles.find(x => x.profile_id === boundProfileId);
+            return p ? p.attrs.map(a => a.name) : null;   // 未绑定档案 → null
+        }
+        function aiReassignAttr(idx, item) {
+            if (!item || item.querySelector('.dp-reassign')) return;
+            const e = aiDrafts.find(x => x.idx === idx);
+            if (!e) return;
+            const names = aiContractAttrs();
+            if (!names) {
+                toast('请先绑定档案（属性下拉的来源），再改属性', 'err');
+                return;
+            }
+            const cur = e.attr || '';
+            // 当前值不在契约里也放进选项（保持原值可选，避免误改）
+            const opts = (names.includes(cur) ? names : [cur, ...names])
+                .map(n => `<option value="${aiEsc(n)}"${n === cur ? ' selected' : ''}>${aiEsc(n)}</option>`).join('');
+            const bar = document.createElement('div');
+            bar.className = 'dp-btns dp-reassign';
+            bar.innerHTML =
+                `<select style="flex:1; min-width:0; border:1px solid var(--accent); background:var(--surface);
+                    color:var(--ink); padding:4px 8px; font-size:12px; font-family:inherit;">${opts}</select>
+                 <button class="primary" data-act="reassign-save">改</button>
+                 <button data-act="reassign-cancel">取消</button>`;
+            item.appendChild(bar);
+            const sel = bar.querySelector('select');
+            sel.focus();
+            bar.addEventListener('click', async ev => {
+                ev.stopPropagation();
+                const act = ev.target.closest('button')?.dataset.act;
+                if (act === 'reassign-cancel') { bar.remove(); return; }
+                if (act !== 'reassign-save') return;
+                const nv = sel.value;
+                if (!nv || nv === cur) { bar.remove(); return; }
+                try {
+                    const r = await fetch(`/api/preannotations/${encodeURIComponent(imageName)}/reassign`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({idx: idx, old_attr: cur, new_attr: nv}),
+                    });
+                    const d = await r.json();
+                    if (!d.success) { toast(d.error || '改属性失败', 'err'); return; }
+                    bar.remove();
+                    toast(`✓ 属性已改为「${nv}」（本条回到待裁）`, 'ok');
+                    await loadDrafts();
+                } catch (err) { toast('网络错误：' + err, 'err'); }
+            });
+        }
+
+        // 修正 = 就地改字（草稿值预填），回车写回并采纳
+        function aiAmend(idx, item) {
+            if (item.querySelector('.dp-edit')) {
+                item.querySelector('.dp-edit').focus();
+                return;
+            }
+            const e = aiDrafts.find(x => x.idx === idx);
+            if (!e) return;
+            const bar = document.createElement('div');
+            bar.className = 'dp-btns';
+            bar.innerHTML =
+                `<input class="dp-edit" type="text" value="${aiEsc(e.text)}" spellcheck="false"
+                    style="flex:1; min-width:0; border:1px solid var(--accent); background:var(--surface);
+                           color:var(--ink); padding:4px 8px; font-size:13px;">
+                 <button class="primary" data-act="amend-save">采纳</button>
+                 <button data-act="amend-cancel">取消</button>`;
+            item.appendChild(bar);
+            const inp = bar.querySelector('input');
+            inp.focus();
+            inp.select();
+            inp.addEventListener('keydown', ev => {
+                if (ev.key === 'Enter') { ev.preventDefault(); aiDecide(idx, 'accept', {text: inp.value}); }
+                else if (ev.key === 'Escape') { ev.preventDefault(); bar.remove(); }
+            });
+        }
+
+        aiList.addEventListener('click', ev => {
+            const item = ev.target.closest('.dp-item');
+            if (!item) return;
+            const idx = parseInt(item.dataset.idx, 10);
+            // M5：分段视图的两种交互（须先于通用 button 分支判定）
+            if (ev.target.closest('.dp-fold')) {
+                ev.stopPropagation(); aiToggleSegs(idx); return;
+            }
+            const segEl = ev.target.closest('.dp-seg');
+            if (segEl) {
+                ev.stopPropagation();
+                aiPickSeg(idx, parseInt(segEl.dataset.seg, 10));
+                return;
+            }
+            const btn = ev.target.closest('button');
+            if (!btn) { aiFocusIdx(idx); return; }
+            ev.stopPropagation();
+            const act = btn.dataset.act;
+            if (act === 'accept') aiDecide(idx, 'accept');
+            else if (act === 'reject') aiDecide(idx, 'reject');
+            else if (act === 'reset') aiDecide(idx, 'reset');
+            else if (act === 'zoom') aiFocusIdx(idx, true);
+            else if (act === 'amend') aiAmend(idx, item);
+            else if (act === 'amend-cancel') item.querySelector('.dp-edit').parentElement.remove();
+            else if (act === 'amend-save') {
+                const inp = item.querySelector('.dp-edit');
+                aiDecide(idx, 'accept', {text: inp.value});
+            }
+        });
+
+        // 面板内键盘：↑↓ 选条 · Enter 通过 · X 忽略 · E 修正
+        // （输入框获得焦点时不接管，避免与标注录入的 Enter 冲突）
+        document.addEventListener('keydown', ev => {
+            if (!aiPanel.classList.contains('open')) return;
+            const tag = (ev.target.tagName || '').toUpperCase();
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            const list = aiDrafts.filter(e => e.status === 'pending');
+            if (!list.length) return;
+            const cur = list.findIndex(e => e.idx === aiFocus);
+            if (ev.key === 'ArrowDown') {
+                ev.preventDefault();
+                aiFocusIdx(list[Math.min(list.length - 1, cur + 1)].idx);
+            } else if (ev.key === 'ArrowUp') {
+                ev.preventDefault();
+                aiFocusIdx(list[Math.max(0, cur - 1)].idx);
+            } else if (ev.key === 'Enter' && cur >= 0) {
+                ev.preventDefault(); aiDecide(aiFocus, 'accept');
+            } else if ((ev.key === 'x' || ev.key === 'X') && cur >= 0) {
+                ev.preventDefault(); aiDecide(aiFocus, 'reject');
+            } else if ((ev.key === 'e' || ev.key === 'E') && cur >= 0) {
+                ev.preventDefault();
+                const item = aiList.querySelector(`.dp-item[data-idx="${aiFocus}"]`);
+                if (item) aiAmend(aiFocus, item);
+            }
+        });
+
+        // ========== 加载已有标注 ==========
+        async function loadExisting() {
+            try {
+                const r = await fetch(`/api/manual_annotations/${encodeURIComponent(imageName)}`);
+                const d = await r.json();
+                if (d.success) {
+                    annots = d.items;
+                    renderAll();
+                }
+            } catch (e) {
+                console.error('加载已有标注失败:', e);
+            }
+        }
+
+        // ========== 加载 OCR 记录（参考底图） ==========
+        async function loadOcrRecords() {
+            try {
+                const r = await fetch(`/api/ocr_records?image=${encodeURIComponent(imageName)}`);
+                const d = await r.json();
+                if (d.success) {
+                    // 2026-08-18：先看 ocr_state
+                    const s = d.ocr_state || { status: "unknown" };
+                    const banner = document.getElementById('ocr-progress-banner');
+                    const bannerText = document.getElementById('ocr-progress-text');
+                    if (s.status === "running") {
+                        // OCR 识别中 → 显示黄色 banner + 不渲染任何红框
+                        // （避免 race condition：API 读到部分数据时误显示"完成"）
+                        banner.style.display = 'flex';
+                        const backendModel = s.backend && s.model
+                            ? `${s.backend} · ${s.model}`
+                            : (s.backend || 'OCR');
+                        let detail = `OCR 识别中（${backendModel}）`;
+                        if (s.count > 0) {
+                            detail += ` · 已识别 ${s.count} 个 box`;
+                        }
+                        if (s.started_at) {
+                            const elapsed = Math.max(0, Math.floor((Date.now() / 1000) - s.started_at));
+                            detail += ` · 已用 ${elapsed}s`;
+                        }
+                        bannerText.textContent = detail;
+                        // 不更新 ocrRecords，保留上次的状态（或清空）
+                        // 不渲染红框
+                        ocrRecords = [];
+                        updateOcrCount();
+                        renderAll();
+                        // 5 秒后自动重试（轮询）
+                        if (window._ocrProgressTimer) clearTimeout(window._ocrProgressTimer);
+                        window._ocrProgressTimer = setTimeout(loadOcrRecords, 5000);
+                        return;
+                    } else if (s.status === "failed") {
+                        // OCR 失败 → 红色 banner
+                        banner.style.display = 'flex';
+                        banner.style.background = 'var(--accent)';
+                        banner.style.borderBottomColor = 'var(--ink)';
+                        banner.style.color = '#fff';
+                        bannerText.textContent = `OCR 失败：${s.error || '未知错误'}`;
+                        ocrRecords = d.records || [];
+                        updateOcrCount();
+                        renderAll();
+                        return;
+                    } else {
+                        // done / unknown → 正常显示
+                        banner.style.display = 'none';
+                        banner.style.background = 'var(--success-tint)';
+                        banner.style.borderBottomColor = 'var(--success)';
+                        banner.style.color = 'var(--ink)';
+                        if (window._ocrProgressTimer) {
+                            clearTimeout(window._ocrProgressTimer);
+                            window._ocrProgressTimer = null;
+                        }
+                    }
+                    ocrRecords = d.records;
+                    updateOcrCount();
+                    renderAll();
+                }
+            } catch (e) {
+                console.error('加载 OCR 记录失败:', e);
+            }
+        }
+
+        function updateOcrCount() {
+            const el = document.getElementById('ocr-count');
+            const el2 = document.getElementById('ocr-corrected-count');
+            if (el) el.textContent = `(${ocrRecords.length})`;
+            const corrected = ocrRecords.filter(r => r.status === '已校对').length;
+            if (el2) el2.textContent = corrected > 0 ? `· ${corrected} 已校对` : '';
+        }
+
+        function toggleOcrVisibility(checked) {
+            showOcr = checked;
+            renderAll();
+        }
+
+        // ========== 渲染 ==========
+        // ✅ M22 清理：原 clearOverlay() 零调用，已删。
+
+        function renderDraft() {
+            const old = svg.querySelector('.draft-rect');
+            if (old) old.remove();
+            if (!draft) return;
+            const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            r.setAttribute('class', 'draft-rect');
+            r.setAttribute('x', Math.min(draft.x1, draft.x2));
+            r.setAttribute('y', Math.min(draft.y1, draft.y2));
+            r.setAttribute('width', Math.abs(draft.x2 - draft.x1));
+            r.setAttribute('height', Math.abs(draft.y2 - draft.y1));
+            svg.appendChild(r);
+        }
+
+        function renderSaved() {
+            // 删旧，保留 draft + pending
+            svg.querySelectorAll('.saved-rect, .box-label, .selected-rect, .pending-rect, .pending-label')
+                .forEach(el => el.remove());
+            // P1d：组标签表（gid -> 组首行号），组内段标签显示 "组首-段序"
+            const gm = groupMap();
+            const labels = new Array(annots.length);
+            annots.forEach((a, i) => {
+                if (!a.gid) { labels[i] = String(i + 1); return; }
+                const g = gm.get(a.gid);
+                labels[i] = `${g.firstIdx + 1}-${g.idxs.indexOf(i) + 1}`;
+            });
+            annots.forEach((a, i) => {
+                const [nx1, ny1, nx2, ny2] = a.box;
+                const [dx1, dy1] = naturalToDisplay(nx1, ny1);
+                const [dx2, dy2] = naturalToDisplay(nx2, ny2);
+                // P1d-post：归组模式中显示点选顺序（1-based）
+                const pickPos = picking !== null ? picking.indexOf(i) : -1;
+                const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                r.setAttribute('class', 'box-rect saved-rect'
+                    + (i === selectedId ? ' selected-rect' : '')
+                    + (a.gid ? ' grouped-rect' : '')
+                    + (pickPos >= 0 ? ' picked-rect' : ''));
+                r.setAttribute('x', dx1);
+                r.setAttribute('y', dy1);
+                r.setAttribute('width', dx2 - dx1);
+                r.setAttribute('height', dy2 - dy1);
+                r.dataset.idx = i;
+                r.addEventListener('click', (e) => {
+                    if (didDrag) { didDrag = false; return; }   // P1d-ui：拖拽画框结束，非选择意图
+                    e.stopPropagation();
+                    // P1d-post：归组模式中点击 = 加入/移出归组选择
+                    if (picking !== null) { togglePick(i); return; }
+                    selectByIndex(i);
+                });
+                // P1a：属性着色（同属性同色；inline style 优先于类样式）
+                const ac = attrColor(a.attr);
+                if (pickPos < 0 && ac) {
+                    r.style.stroke = ac;
+                    r.style.fill = hexToRgba(ac, 0.10);
+                }
+                svg.appendChild(r);
+                // 编号标签（P1d：组内显示 "组首-段序"，如 12-2；P1d-post：归组中显示点选序号；P1d-x：跨页角标 ↑承/↓接）
+                const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                t.setAttribute('class', 'box-label');
+                t.setAttribute('x', dx1 + 2);
+                t.setAttribute('y', dy1 - 4 > 12 ? dy1 - 4 : dy1 + 14);
+                const xpMark = a.xp === 'prev' ? ' ↑' : a.xp === 'next' ? ' ↓' : '';
+                t.textContent = pickPos >= 0 ? String(pickPos + 1) : labels[i] + xpMark;
+                t.setAttribute('title', a.xp === 'prev' ? '承上页（上一页末条记录的延续）'
+                    : a.xp === 'next' ? '接下页（记录延续到下一页）' : '');
+                if (pickPos < 0 && ac) {
+                    t.style.fill = ac;
+                    t.style.stroke = ac;
+                }
+                svg.appendChild(t);
+            });
+            // 渲染 pending（脉冲高亮）
+            if (pendingBox) {
+                const [dx1, dy1] = naturalToDisplay(pendingBox.x1, pendingBox.y1);
+                const [dx2, dy2] = naturalToDisplay(pendingBox.x2, pendingBox.y2);
+                const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                r.setAttribute('class', 'pending-rect');
+                r.setAttribute('x', dx1);
+                r.setAttribute('y', dy1);
+                r.setAttribute('width', dx2 - dx1);
+                r.setAttribute('height', dy2 - dy1);
+                svg.appendChild(r);
+                const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                t.setAttribute('class', 'pending-label');
+                t.setAttribute('x', dx1 + 2);
+                t.setAttribute('y', dy1 - 4 > 14 ? dy1 - 4 : dy1 + 16);
+                t.textContent = '?';
+                svg.appendChild(t);
+            }
+        }
+
+        function renderAll() {
+            renderDraft();
+            renderOcrRecords();
+            renderSaved();
+            document.getElementById('count').textContent = annots.length;
+            // P1a：属性标注计数（P1d 起按组口径：gid 组计 1）
+            document.getElementById('attr-count').textContent = countAttrAnnotations();
+            refreshContBtn();   // P1d-post：归组按钮状态唯一出口
+        }
+
+        // ========== 渲染 OCR 参考框（红虚线 = 未校对；绿实线 = 已校对） ==========
+        function renderOcrRecords() {
+            // 清掉旧的
+            svg.querySelectorAll('.ocr-rect, .ocr-corrected-rect, .ocr-label, .ocr-corrected-label, .ocr-selected-rect')
+                .forEach(el => el.remove());
+            if (!showOcr || ocrRecords.length === 0) return;
+            ocrRecords.forEach((rec, i) => {
+                let box;
+                try {
+                    // box_json 是 OCR 引擎输出的 4 顶点 polygon（[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]）
+                    const poly = JSON.parse(rec.box_json);
+                    const xs = poly.map(p => p[0]);
+                    const ys = poly.map(p => p[1]);
+                    box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+                } catch (e) {
+                    return;  // 跳过解析失败的
+                }
+                const [nx1, ny1, nx2, ny2] = box;
+                const [dx1, dy1] = naturalToDisplay(nx1, ny1);
+                const [dx2, dy2] = naturalToDisplay(nx2, ny2);
+                const isCorrected = rec.status === '已校对';
+                const isSelected = i === ocrSelectedId;
+                const cls = isCorrected
+                    ? (isSelected ? 'ocr-corrected-rect ocr-selected-rect' : 'ocr-corrected-rect')
+                    : (isSelected ? 'ocr-rect ocr-selected-rect' : 'ocr-rect');
+                const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                r.setAttribute('class', 'box-rect ' + cls);
+                r.setAttribute('x', dx1);
+                r.setAttribute('y', dy1);
+                r.setAttribute('width', dx2 - dx1);
+                r.setAttribute('height', dy2 - dy1);
+                r.dataset.ocrIdx = i;
+                r.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (didDrag) { didDrag = false; return; }   // P1d-ui：拖拽画框结束，非选择意图
+                    selectOcrByIndex(i);
+                });
+                svg.appendChild(r);
+                // 标签：列-段 编号（如 OCR 1-2）
+                const label = `${rec.col_index + 1}-${rec.row_index + 1}`;
+                const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                t.setAttribute('class', isCorrected ? 'ocr-corrected-label' : 'ocr-label');
+                t.setAttribute('x', dx1 + 2);
+                t.setAttribute('y', dy1 - 4 > 12 ? dy1 - 4 : dy1 + 12);
+                t.textContent = label;
+                svg.appendChild(t);
+            });
+        }
+
+        // ========== 选中 / 编辑 / 删除 ==========
+        function selectByIndex(i) {
+            selectedId = i;
+            ocrSelectedId = null;  // 互斥：选 manual 时清空 OCR 选中
+            const a = annots[i];
+            if (!a) {
+                textInput.value = '';
+                textInput.disabled = true;
+                btnSave.disabled = true;
+                btnDel.disabled = true;
+                btnCancel.disabled = true;
+                inputBar.classList.add('disabled');
+                inputBar.style.borderTopColor = 'var(--border)';
+                xpageSelect.value = '';   // P1d-x fix：取消选中同样复位（防粘到下一个新框）
+                statusEl.className = 'status';
+                statusEl.textContent = '拖拽画框 · 单击已有框编辑 · 点空白取消 · 续框/跨页=收尾（顶栏）';
+                renderAll();
+                return;
+            }
+            // 取消 pending（如果存在）
+            if (pendingBox) cancelPending();
+            textInput.value = a.text;
+            // P1a：属性回显（attr 不在当前档案属性表时下拉显示为空，属预期降级）
+            if (!attrSelect.disabled) {
+                attrSelect.value = (a.attr && attrSelect.querySelector(`option[value="${CSS.escape(a.attr)}"]`))
+                    ? a.attr : '';
+            }
+            xpageSelect.value = a.xp || '';   // P1d-x：跨页标记回显
+            textInput.disabled = false;
+            textInput.focus();
+            textInput.select();  // 全选便于覆盖输入
+            btnSave.disabled = false;
+            btnDel.disabled = false;
+            btnCancel.disabled = true;
+            inputBar.classList.remove('disabled');
+            inputBar.style.borderTopColor = 'var(--accent)';
+            statusEl.className = 'status';
+            // P1d：组内行显示组全貌（全文=各段拼接）
+            let grpInfo = '';
+            if (a.gid) {
+                const g = groupMap().get(a.gid);
+                const full = g.idxs.map(k => annots[k].text).join('');
+                grpInfo = ` · 组 ${g.idxs.length} 段 · 全文「${full}」`;
+            }
+            const xpInfo = a.xp === 'prev' ? ' · <span style="color:var(--warning)">承上页</span>'
+                : a.xp === 'next' ? ' · <span style="color:var(--warning)">接下页</span>' : '';
+            statusEl.innerHTML = `<b>编辑 #${labels_text(i, a)}</b>` +
+                (a.attr ? ` · 「${a.attr}」` : '') + xpInfo +
+                ` · 框 (${a.box.join(', ')}) · ${a.text.length} 字${grpInfo}`;
+            renderAll();
+        }
+        // P1d：标注显示编号（组内 "组首-段序"）
+        function labels_text(i, a) {
+            if (!a.gid) return i + 1;
+            const g = groupMap().get(a.gid);
+            return `${g.firstIdx + 1}-${g.idxs.indexOf(i) + 1}`;
+        }
+
+        // ========== 选中 OCR 参考框（用于改字保存到 xlsx） ==========
+        function selectOcrByIndex(i) {
+            // P1d-post：归组模式中 OCR 框不参与（只点标注框）
+            if (picking !== null) {
+                toast('归组中：请点击标注框（绿虚线为已选）', 'err');
+                return;
+            }
+            ocrSelectedId = i;
+            selectedId = null;  // 互斥
+            const rec = ocrRecords[i];
+            if (!rec) {
+                clearInputBar();
+                renderAll();
+                return;
+            }
+            if (pendingBox) cancelPending();
+            // 默认显示 corrected_text（已校对）或原 OCR 文字
+            const current = (rec.corrected_text && rec.corrected_text.trim()) || rec.text;
+            textInput.value = current;
+            textInput.disabled = false;
+            textInput.focus();
+            textInput.select();
+            xpageSelect.value = '';   // P1d-x：新选择上下文，跨页标记复位（转存前可再选）
+            btnSave.disabled = false;
+            btnDel.disabled = true;   // OCR 框不能直接删（要从 xlsx 删）
+            btnCancel.disabled = true;
+            inputBar.classList.remove('disabled');
+            inputBar.style.borderTopColor = 'var(--accent)';
+            statusEl.className = 'status';
+            const isCorrected = rec.status === '已校对';
+            // P1a：提示双通道——选属性=转存属性标注；不选=改字到 xlsx
+            const convHint = attrSelect.disabled ? '' : ' · 选属性=转存属性标注，不选=改字到 xlsx';
+            statusEl.innerHTML = `<b>OCR ${rec.col_index + 1}-${rec.row_index + 1}</b>${isCorrected ? ' · <span style="color:var(--success)">已校对</span>' : ' · 未校对'} · ${current.length} 字${convHint}`;
+            renderAll();
+        }
+
+        function clearInputBar() {
+            textInput.value = '';
+            textInput.disabled = true;
+            btnSave.disabled = true;
+            btnDel.disabled = true;
+            btnCancel.disabled = true;
+            inputBar.classList.add('disabled');
+            inputBar.style.borderTopColor = 'var(--border)';
+            xpageSelect.value = '';   // P1d-x：非粘滞
+            statusEl.className = 'status';
+            statusEl.textContent = '拖拽画框 · 单击已有框编辑 · 点空白取消 · 续框/跨页=收尾（顶栏）';
+        }
+
+        // ========== 保存 OCR 校对（写到 xlsx）；P1a：选了属性 → 转存为属性标注 ==========
+        async function saveOcrCorrection() {
+            if (ocrSelectedId === null || ocrSelectedId === undefined) return;
+            const rec = ocrRecords[ocrSelectedId];
+            const newText = textInput.value.trim();
+            if (!newText) {
+                toast('文字不能为空', 'err');
+                return;
+            }
+            // P1a（§4.7c）：选中属性时，保存 = 转存为属性标注（框坐标复用 OCR 框，
+            // 文本预填已校对优先）；未选属性 = 原行为（改字写回 xlsx）
+            const attr = (!attrSelect.disabled && attrSelect.value) ? attrSelect.value : '';
+            if (attr) {
+                await convertOcrToAttrAnnotation(rec, newText, attr);
+                return;
+            }
+            try {
+                const r = await fetch('/api/save', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id: rec.id, corrected_text: newText }),
+                });
+                const d = await r.json();
+                if (d.success) {
+                    rec.corrected_text = newText;
+                    rec.status = '已校对';
+                    updateOcrCount();
+                    renderAll();
+                    statusEl.innerHTML = `<b>OCR ${rec.col_index + 1}-${rec.row_index + 1}</b> · <span style="color:var(--success)">已校对</span> · ${newText.length} 字 ✓`;
+                    toast('✓ 已校对并保存到 xlsx', 'ok');
+                } else {
+                    toast('保存失败：' + d.error, 'err');
+                }
+            } catch (e) {
+                toast('网络错误：' + e, 'err');
+            }
+        }
+
+        // P1a：OCR 框 → 属性标注（§4.7c：标注一页从"逐框画字"降为"逐框点选"）
+        async function convertOcrToAttrAnnotation(rec, text, attr) {
+            let box;
+            try {
+                const poly = JSON.parse(rec.box_json);
+                const xs = poly.map(p => p[0]);
+                const ys = poly.map(p => p[1]);
+                box = [Math.round(Math.min(...xs)), Math.round(Math.min(...ys)),
+                       Math.round(Math.max(...xs)), Math.round(Math.max(...ys))];
+            } catch (e) {
+                toast('OCR 框坐标解析失败', 'err');
+                return;
+            }
+            // 去重护栏：同框同属性已转存过 → 跳过（双击/重按 Enter 安全）
+            const dup = annots.some(a => a.attr === attr &&
+                Array.isArray(a.box) && a.box.length === 4 &&
+                a.box.every((v, i) => v === box[i]));
+            if (dup) {
+                toast('该 OCR 框已转存为「' + attr + '」标注', 'err');
+                return;
+            }
+            await saveAnnotation(box, text, attr, xpageSelect.value);
+            xpageSelect.value = '';
+            statusEl.innerHTML = `<b>已转存</b> · 「${attr}」 · ${text.length} 字`;
+        }
+
+        // 选中的修改保存逻辑（覆盖原文字；P1a：同步更新属性）
+        async function saveEdit() {
+            if (selectedId === null || selectedId === undefined) return;
+            const a = annots[selectedId];
+            const newText = textInput.value.trim();
+            if (!newText) {
+                toast('文字不能为空', 'err');
+                return;
+            }
+            a.text = newText;
+            // P1a：属性编辑（改属性=换绑当前档案；清空=删属性键）
+            if (!attrSelect.disabled) {
+                const newAttr = attrSelect.value;
+                if (newAttr) {
+                    a.attr = newAttr;
+                    if (boundProfileId) a.profile = boundProfileId;
+                    markRecentAttr(newAttr);
+                } else {
+                    delete a.attr;
+                }
+                // P1d：组内属性传播（组属性一致性：改一段=改整组）
+                if (a.gid) {
+                    groupMap().get(a.gid).idxs.forEach(k => {
+                        if (k === selectedId) return;
+                        if (a.attr) { annots[k].attr = a.attr; annots[k].profile = a.profile || ''; }
+                        else { delete annots[k].attr; }
+                    });
+                }
+            }
+            // P1d-x：跨页续接标记编辑（组内传播同属性：改一段=改整组）
+            const newXp = xpageSelect.value;
+            if (newXp) { a.xp = newXp; } else { delete a.xp; }
+            if (a.gid) {
+                groupMap().get(a.gid).idxs.forEach(k => {
+                    if (k === selectedId) return;
+                    if (newXp) annots[k].xp = newXp; else delete annots[k].xp;
+                });
+            }
+            xpageSelect.value = '';   // P1d-x fix（2026-09-06 bug）：编辑保存后必须复位——
+            // 否则下拉残留"承上页"，下一个新画框经 commitPending 误继承 xp（昇昌条污染根因）
+            await rewriteAll();
+            renderAll();
+            statusEl.innerHTML = `<b>编辑 #${selectedId + 1}</b>` +
+                (a.attr ? ` · 「${a.attr}」` : '') +
+                (a.xp ? ` · ${a.xp === 'prev' ? '承上页' : '接下页'}` : '') +
+                ` · 框 (${a.box.join(', ')}) · ${a.text.length} 字 ✓`;
+            toast('已更新', 'ok');
+        }
+        btnSave.addEventListener('click', () => {
+            if (pendingBox) commitPending();
+            else if (ocrSelectedId !== null && ocrSelectedId !== undefined) saveOcrCorrection();
+            else if (selectedId !== null && selectedId !== undefined) saveEdit();
+        });
+
+        async function deleteAnnotation(i) {
+            if (i === null || i === undefined || i < 0 || i >= annots.length) return;
+            if (!confirm(`确认删除 #${annots[i].gid ? labels_text(i, annots[i]) : i + 1}「${annots[i].text}」？`)) return;
+            // 推入撤销栈
+            undoStack.push({ idx: i, item: annots[i] });
+            annots.splice(i, 1);
+            selectedId = null;
+            textInput.value = '';
+            textInput.disabled = true;
+            btnSave.disabled = true;
+            btnDel.disabled = true;
+            await rewriteAll();
+            renderAll();
+            statusEl.textContent = `已删除。可按 Ctrl+Z 撤销（共 ${undoStack.length} 步）`;
+        }
+        btnDel.addEventListener('click', () => {
+            if (selectedId !== null && selectedId !== undefined) deleteAnnotation(selectedId);
+        });
+        btnCont.addEventListener('click', () => {
+            // P1d-post：归组按钮 = 开关（进入归组 / 完成归组）
+            if (picking !== null) commitPicking();
+            else startPicking();
+        });
+
+        async function rewriteAll() {
+            try {
+                const r = await fetch('/api/rewrite_manual', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ image_name: imageName, items: annots }),
+                });
+                const d = await r.json();
+                if (!d.success) {
+                    toast('重写失败：' + d.error, 'err');
+                }
+            } catch (e) {
+                toast('重写失败：' + e, 'err');
+            }
+        }
+
+        // ========== 优化 1：撤销（Ctrl+Z） ==========
+        async function undo() {
+            if (picking !== null) cancelPicking();   // P1d-post：撤销改变下标，先退出归组
+            if (undoStack.length === 0) {
+                toast('没有可撤销的操作', 'err');
+                return;
+            }
+            const last = undoStack.pop();
+            annots.splice(last.idx, 0, last.item);
+            // 重新选中
+            selectByIndex(last.idx);
+            await rewriteAll();
+            renderAll();
+            toast(`已撤销 #${last.idx + 1}（剩 ${undoStack.length} 步）`, 'ok');
+        }
+
+        // ========== 键盘快捷键 ==========
+        document.addEventListener('keydown', e => {
+            // 输入框里不抢 Ctrl+Z（让浏览器原生 undo 失效）
+            // 内联弹窗（ask-modal）里同样让路 —— 否则打字时的 N / Del / Esc 会被快捷键吃掉
+            const inInput = e.target === textInput
+                || (e.target && e.target.id === 'ask-input');
+            if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
+                e.preventDefault();
+                undo();
+            } else if (!inInput && (e.key === 'n' || e.key === 'N')) {
+                // P1d-post：N = 归组开关（进入归组选择 / 完成归组）
+                e.preventDefault();
+                if (picking !== null) commitPicking();
+                else startPicking();
+            } else if (!inInput && e.key === 'Delete' && selectedId !== null && selectedId !== undefined) {
+                e.preventDefault();
+                deleteAnnotation(selectedId);
+            } else if (!inInput && e.key === 'Escape') {
+                if (pendingBox) cancelPending();
+                else if (picking !== null) cancelPicking();   // P1d-post：先取消归组
+                else if (ocrSelectedId !== null) selectOcrByIndex(null);
+                else if (selectedId !== null) selectByIndex(null);
+            } else if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                if (picking !== null) commitPicking();   // P1d-post：归组中 Ctrl+S = 完成归组
+                else if (pendingBox) commitPending();
+                else if (ocrSelectedId !== null) saveOcrCorrection();
+                else if (selectedId !== null) saveEdit();
+            }
+        });
+
+        // ========== P1d-easy：底栏"说明"弹层（同知识卡片/设置页交互） ==========
+        function toggleHelp(e) {
+            e.stopPropagation();
+            const pop = document.getElementById('help-pop');
+            const btn = e.currentTarget;
+            const wasOpen = pop.classList.contains('open');
+            pop.classList.toggle('open', !wasOpen);
+            btn.classList.toggle('open', !wasOpen);
+        }
+        function closeHelp() {
+            document.getElementById('help-pop').classList.remove('open');
+            document.querySelector('.input-bar .btn-info').classList.remove('open');
+        }
+        document.addEventListener('click', e => {
+            // 点弹层/说明按钮以外任意处关闭
+            if (!e.target.closest('.help-pop') && !e.target.closest('.btn-info')) closeHelp();
+        });
+
+        // ========== Toast ==========
+        function toast(msg, type) {            const el = document.createElement('div');
+            el.style.cssText = `
+                position: fixed; top: 70px; right: 20px; z-index: 9999;
+                padding: 10px 16px;
+                background: ${type === 'ok' ? 'var(--success)' : type === 'err' ? 'var(--accent)' : 'var(--ink)'};
+                color: #fff; font-size: 13px;
+                box-shadow: 0 2px 8px rgba(0,0,0,.4);`;
+            el.textContent = msg;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 2000);
+        }
+
+        // ========== P1a：档案管理弹窗（列表/绑定/新建/删除/模板导入） ==========
+        async function openProfileModal() {
+            await loadProfiles();
+            await loadTemplatesForModal();
+            renderProfList();
+            document.getElementById('profile-modal').classList.add('open');
+        }
+        function closeProfileModal() {
+            document.getElementById('profile-modal').classList.remove('open');
+        }
+        // 点遮罩关闭（点面板本身不关）
+        document.getElementById('profile-modal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) closeProfileModal();
+        });
+
+        // ========== 内联文本输入（替代原生 prompt；Electron 不支持 prompt） ==========
+        let _askResolve = null;
+        function askText({title, message, placeholder, value, okText} = {}) {
+            if (_askResolve) { const r = _askResolve; _askResolve = null; r(null); }
+            document.getElementById('ask-title').textContent = title || '输入';
+            document.getElementById('ask-msg').textContent = message || '';
+            const inp = document.getElementById('ask-input');
+            inp.value = value || '';
+            inp.placeholder = placeholder || '';
+            document.getElementById('ask-ok').textContent = okText || '确定';
+            document.getElementById('ask-modal').classList.add('open');
+            setTimeout(() => { inp.focus(); inp.select(); }, 0);
+            return new Promise(resolve => { _askResolve = resolve; });
+        }
+        function askDone(v) {
+            const r = _askResolve; _askResolve = null;
+            document.getElementById('ask-modal').classList.remove('open');
+            if (r) r(v);
+        }
+        function askCancel() { askDone(null); }
+        document.getElementById('ask-ok').addEventListener('click', () => {
+            askDone(document.getElementById('ask-input').value);
+        });
+        document.getElementById('ask-input').addEventListener('keydown', e => {
+            e.stopPropagation();              // 别让底栏快捷键（N/Del/Esc/Ctrl+Z）抢键
+            if (e.key === 'Enter') { e.preventDefault(); askDone(e.target.value); }
+            else if (e.key === 'Escape') { e.preventDefault(); askCancel(); }
+        });
+        document.getElementById('ask-modal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) askCancel();
+        });
+
+        async function loadTemplatesForModal() {
+            try {
+                const r = await fetch('/api/templates');
+                const d = await r.json();
+                const sel = document.getElementById('tmpl-select');
+                sel.innerHTML = '<option value="">（选择模板…）</option>' +
+                    (d.templates || []).map(t =>
+                        `<option value="${t.template_id}">${t.name}</option>`).join('');
+            } catch (e) {
+                console.error('模板加载失败:', e);
+            }
+        }
+
+        function renderProfList() {
+            const el = document.getElementById('prof-list');
+            if (!profiles.length) {
+                el.innerHTML = '<div style="color:var(--muted);">尚无档案。先在下方新建。</div>';
+                return;
+            }
+            el.innerHTML = profiles.map(p => `
+                <div class="prof-row${p.profile_id === boundProfileId ? ' active' : ''}">
+                    <span class="prof-name">${p.name}</span>
+                    <span class="prof-attrs" title="${p.attrs.map(a => a.name).join('、')}">
+                        ${p.attrs.length} 属性：${p.attrs.map(a => a.name).join('、') || '（空）'}</span>
+                    <button class="btn-mini btn-primary" onclick="bindProfile('${p.profile_id}')">绑定</button>
+                    <button class="btn-mini btn-danger" onclick="deleteProfileAsk('${p.profile_id}')">删除</button>
+                </div>`).join('');
+        }
+
+        function bindProfile(pid) {
+            onProfileChange(pid);
+            renderProfList();
+            toast('已绑定档案', 'ok');
+        }
+
+        async function createProfile() {
+            const name = document.getElementById('new-prof-name').value.trim();
+            if (!name) { toast('档案名不能为空', 'err'); return; }
+            const description = document.getElementById('new-prof-desc').value.trim();
+            try {
+                const r = await fetch('/api/profiles', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, description}),
+                });
+                const d = await r.json();
+                if (d.success) {
+                    await loadProfiles();
+                    onProfileChange(d.profile.profile_id);   // 新建即绑定
+                    renderProfList();
+                    document.getElementById('new-prof-name').value = '';
+                    document.getElementById('new-prof-desc').value = '';
+                    toast('✓ 档案已创建并绑定', 'ok');
+                } else {
+                    toast('创建失败：' + d.error, 'err');
+                }
+            } catch (e) {
+                toast('网络错误：' + e, 'err');
+            }
+        }
+
+        async function importTemplateToBound() {
+            if (!boundProfileId) { toast('请先绑定一个档案', 'err'); return; }
+            const tid = document.getElementById('tmpl-select').value;
+            if (!tid) { toast('请选择模板', 'err'); return; }
+            try {
+                const r = await fetch(`/api/profiles/${encodeURIComponent(boundProfileId)}/import_template`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({template_id: tid}),
+                });
+                const d = await r.json();
+                if (d.success) {
+                    profiles = profiles.map(p => p.profile_id === boundProfileId ? d.profile : p);
+                    refreshProfileSelect();
+                    renderProfList();
+                    toast(`✓ 已导入，档案共 ${d.profile.attrs.length} 属性`, 'ok');
+                } else {
+                    toast('导入失败：' + d.error, 'err');
+                }
+            } catch (e) {
+                toast('网络错误：' + e, 'err');
+            }
+        }
+
+        async function deleteProfileAsk(pid) {
+            const p = profiles.find(x => x.profile_id === pid);
+            if (!p) return;
+            if (!confirm(`确认删除档案「${p.name}」？\n已保存的标注不受影响（仅失去属性着色/下拉来源）；文件移入 _trash/ 可找回。`)) return;
+            try {
+                const r = await fetch(`/api/profiles/${encodeURIComponent(pid)}`, {method: 'DELETE'});
+                const d = await r.json();
+                if (d.success) {
+                    if (boundProfileId === pid) onProfileChange('');
+                    await loadProfiles();
+                    renderProfList();
+                    toast('已删除（移入回收站）', 'ok');
+                } else {
+                    toast('删除失败：' + d.error, 'err');
+                }
+            } catch (e) {
+                toast('网络错误：' + e, 'err');
+            }
+        }
+
+        // ========== 初始化：加载档案（P1a） ==========
+        loadProfiles();
+    </script>
+</body>
+</html>
